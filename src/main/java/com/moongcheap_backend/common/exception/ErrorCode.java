@@ -78,7 +78,10 @@ public enum ErrorCode {
 
     // GroupBuy
     GROUPBUY_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUPBUY_001", "공동구매를 찾을 수 없습니다."),
-    GROUPBUY_NOT_OPEN(HttpStatus.CONFLICT, "GROUPBUY_002", "현재 주문할 수 없는 공동구매입니다.");
+    GROUPBUY_NOT_OPEN(HttpStatus.CONFLICT, "GROUPBUY_002", "현재 주문할 수 없는 공동구매입니다."),
+
+    // Search
+    SEARCH_INDEX_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SEARCH_001", "상품 검색 인덱싱에 실패했습니다.");
 
     private final HttpStatus status;
     private final String code;

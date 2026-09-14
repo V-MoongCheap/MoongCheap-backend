@@ -50,6 +50,16 @@ springdoc:
     with-credentials: true
   default-produces-media-type: application/json
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      opensearch:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 3
+        record-failure-predicate: com.moongcheap_backend.common.config.OpenSearchFailurePredicate
+
 moongcheap:
   batch:
     demand-expire:

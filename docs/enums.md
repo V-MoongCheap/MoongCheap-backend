@@ -2,6 +2,26 @@
 
 > Status 값은 [status.md](status.md)를 참조하세요.
 
+## SellerStatus
+> `com.moongcheap_backend.member.domain.SellerStatus`
+> 판매자 계정의 심사·운영 상태를 나타냅니다.
+
+| 값 | 설명 |
+|---|---|
+| `PENDING` | 판매자 등록 신청 후 관리자 심사 대기 중 |
+| `APPROVED` | 심사 완료, 정상 영업 가능 상태 |
+| `BLOCKED` | 관리자에 의해 판매 차단된 상태 |
+| `WITHDRAWN` | 판매자 스스로 탈퇴한 상태 |
+
+**상태 전이**
+```
+PENDING → APPROVED   (관리자 승인)
+APPROVED → BLOCKED   (관리자 차단)
+APPROVED → WITHDRAWN (판매자 탈퇴 → softDelete())
+```
+
+---
+
 ## MemberRole
 > **Java enum** `com.moongcheap_backend.common.security.MemberRole`
 > 회원의 역할(권한)을 나타냅니다. Spring Security 인증에 사용됩니다. `Member.isSeller` 값에서 파생됩니다.
@@ -113,5 +133,7 @@
 | `BUSINESS_NUMBER_INVALID` | 400 | SELLER_002 | 사업자등록번호 형식이 올바르지 않습니다. |
 | `BUSINESS_NUMBER_DUPLICATED` | 409 | SELLER_003 | 이미 등록된 사업자등록번호입니다. |
 | `SELLER_NOT_FOUND` | 404 | SELLER_004 | 판매자 정보를 찾을 수 없습니다. |
+| `SELLER_INTEREST_CATEGORY_REQUIRED` | 400 | SELLER_005 | 관심 카테고리는 최소 1개 이상 지정해야 합니다. |
+| `SELLER_INTEREST_CATEGORY_LIMIT` | 400 | SELLER_006 | 관심 카테고리는 최대 10개까지 지정할 수 있습니다. |
 | `SELLER_MUTABLE_FIELD_ONLY` | 400 | SELLER_007 | 해당 필드는 수정할 수 없습니다. |
 | `SELLER_NOT_APPROVED` | 403 | SELLER_008 | 승인된 판매자만 사용할 수 있습니다. |

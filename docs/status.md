@@ -67,7 +67,6 @@ UNASSIGNED → EXPIRED                     (2일 초과 미배정)
 SUBSTITUTE_OFFERED → ASSIGNED            (제안 수락)
 SUBSTITUTE_OFFERED → EXPIRED             (제안 무응답·거절)
 ASSIGNED → PAYMENT_PENDING              (낙찰 확정)
-ASSIGNED → FAILED                       (소속 보드 미낙찰 / 최소 수량 미달, 시스템)
 PAYMENT_PENDING → CLOSED                (본인 결제 완료)
 ASSIGNED / UNASSIGNED → CANCELED        (사용자 취소, MVP 확정 대기)
 ```
