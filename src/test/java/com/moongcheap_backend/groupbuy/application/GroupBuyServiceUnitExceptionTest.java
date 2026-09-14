@@ -15,6 +15,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+/**
+ * 테스트 대상: {@link GroupBuyService}의 조회 예외 처리
+ */
 @ExtendWith(MockitoExtension.class)
 class GroupBuyServiceUnitExceptionTest {
 
@@ -25,7 +28,7 @@ class GroupBuyServiceUnitExceptionTest {
     private GroupBuyService groupBuyService;
 
     @Nested
-    @DisplayName("공동구매 상세 조회 예외")
+    @DisplayName("공동구매 상세 조회 - 예외 케이스")
     class GetByIdExceptionTest {
 
         @Test

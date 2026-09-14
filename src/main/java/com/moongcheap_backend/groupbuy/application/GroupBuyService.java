@@ -2,6 +2,8 @@ package com.moongcheap_backend.groupbuy.application;
 
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
+import com.moongcheap_backend.common.outbox.domain.OutboxEvent;
+import com.moongcheap_backend.common.outbox.infrastructure.OutboxEventRepository;
 import com.moongcheap_backend.groupbuy.domain.GroupBuy;
 import com.moongcheap_backend.groupbuy.domain.GroupBuyStatus;
 import com.moongcheap_backend.groupbuy.infrastructure.GroupBuyRepository;
@@ -13,6 +15,8 @@ import com.moongcheap_backend.member.domain.SellerStatus;
 import com.moongcheap_backend.product.application.product.ProductPublicService;
 import com.moongcheap_backend.product.domain.product.Product;
 import com.moongcheap_backend.product.domain.product.ProductStatus;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,8 +27,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class GroupBuyService {
 
+    private static final long JUDGMENT_DELAY_MINUTES = 5;
+    private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
+
     //repo
     private final GroupBuyRepository groupBuyRepository;
+    private final OutboxEventRepository outboxEventRepository;
 
     //service
     private final ProductPublicService productPublicService;
@@ -49,6 +57,7 @@ public class GroupBuyService {
     //공동구매 생성
     @Transactional
     public Void createGroupBuy(Long productId) {
+        // 만료시간 이전의 조건에 맞는 상품데이터
         Product product = productPublicService.
             getByIdAndStatus(productId, ProductStatus.AWARDED);
 
@@ -61,6 +70,17 @@ public class GroupBuyService {
             product.getSaleEndAt(),
             GroupBuyStatus.OPEN
         );
+
+        product.startSale();
+
+        // 공동구매와 Outbox를 같은 트랜잭션으로 저장해 Redis 예약 유실을 방지한다.
+        GroupBuy savedGroupBuy = groupBuyRepository.save(groupBuy);
+        outboxEventRepository.save(OutboxEvent.groupBuyJudgmentScheduled(
+            savedGroupBuy.getId(),
+            savedGroupBuy.getGroupBuyEndAt().plusMinutes(JUDGMENT_DELAY_MINUTES),
+            LocalDateTime.now(ZONE_SEOUL)
+        ));
+
         return null;
     }
 

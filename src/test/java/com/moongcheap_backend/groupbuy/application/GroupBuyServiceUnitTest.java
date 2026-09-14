@@ -26,6 +26,9 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+/**
+ * 테스트 대상: {@link GroupBuyService}의 목록 및 상세 조회 기능
+ */
 @ExtendWith(MockitoExtension.class)
 class GroupBuyServiceUnitTest {
 
@@ -36,7 +39,7 @@ class GroupBuyServiceUnitTest {
     private GroupBuyService groupBuyService;
 
     @Nested
-    @DisplayName("공동구매 목록 조회")
+    @DisplayName("공동구매 목록 조회 - 해피 케이스")
     class GetAllTest {
 
         @Test
@@ -65,7 +68,7 @@ class GroupBuyServiceUnitTest {
     }
 
     @Nested
-    @DisplayName("공동구매 상세 조회")
+    @DisplayName("공동구매 상세 조회 - 해피 케이스")
     class GetByIdTest {
 
         @Test

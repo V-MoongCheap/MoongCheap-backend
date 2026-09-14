@@ -54,6 +54,10 @@ moongcheap:
   batch:
     demand-expire:
       cron: "0 5 * * * *"
+  group-buy:
+    # PENDING Outbox의 Redis 발행 주기와 만료 판정 대상 조회 주기
+    outbox-publish-delay-ms: 1000
+    judgment-poll-delay-ms: 10000
   security:
     session:
       absolute-ttl-default: 24h
