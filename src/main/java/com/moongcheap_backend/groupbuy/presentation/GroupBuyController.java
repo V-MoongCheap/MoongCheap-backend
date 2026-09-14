@@ -1,6 +1,5 @@
 package com.moongcheap_backend.groupbuy.presentation;
 
-import com.moongcheap_backend.common.security.SessionPrincipal;
 import com.moongcheap_backend.groupbuy.application.GroupBuyService;
 import com.moongcheap_backend.groupbuy.presentation.dto.GroupBuyDetailResponse;
 import com.moongcheap_backend.groupbuy.presentation.dto.GroupBuyListResponse;
@@ -32,7 +31,6 @@ public class GroupBuyController {
     )
     @GetMapping
     public ResponseEntity<Page<GroupBuyListResponse>> groupBuyList(
-        SessionPrincipal principal,
         @ParameterObject
         @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
         Pageable pageable) {
@@ -45,8 +43,7 @@ public class GroupBuyController {
     )
     @GetMapping("/{groupBuyId}")
     public ResponseEntity<GroupBuyDetailResponse> groupBuyDetail(
-        SessionPrincipal principal,
         @PathVariable Long groupBuyId) {
-        return ResponseEntity.ok(groupBuyService.getById(principal.memberId(), groupBuyId));
+        return ResponseEntity.ok(groupBuyService.getById(groupBuyId));
     }
 }

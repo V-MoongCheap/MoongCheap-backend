@@ -4,6 +4,7 @@ import com.moongcheap_backend.common.crypto.EncryptionService;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.member.domain.Seller;
+import com.moongcheap_backend.member.domain.SellerStatus;
 import com.moongcheap_backend.member.infrastructure.SellerRepository;
 import com.moongcheap_backend.member.presentation.dto.SellerPublicResponseDto;
 import lombok.RequiredArgsConstructor;
@@ -19,9 +20,7 @@ public class SellerPublicService {
 
     @Transactional(readOnly = true)
     public SellerPublicResponseDto detail(Long sellerId) {
-        Seller seller = sellerRepository.findByIdAndDeletedAtIsNull(sellerId)
-            .filter(Seller::isSellable)
-            .orElseThrow(() -> new BusinessException(ErrorCode.SELLER_NOT_FOUND));
+        Seller seller = getByIdAndStatus(sellerId, SellerStatus.APPROVED);
         String bizPlain = encryptionService.decrypt(seller.getBusinessNumber());
         return new SellerPublicResponseDto(
             seller.getBusinessName(),
@@ -30,5 +29,11 @@ public class SellerPublicService {
             seller.getMailOrderRegistrationNumber(),
             seller.getPhoneNumber()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public Seller getByIdAndStatus(Long sellerId, SellerStatus status) {
+        return sellerRepository.findByIdAndStatusAndDeletedAtIsNull(sellerId, status)
+            .orElseThrow(() -> new BusinessException(ErrorCode.SELLER_NOT_FOUND));
     }
 }

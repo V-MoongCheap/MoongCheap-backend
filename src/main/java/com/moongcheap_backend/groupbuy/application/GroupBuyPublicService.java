@@ -26,4 +26,12 @@ public class GroupBuyPublicService {
 
         return groupBuy;
     }
+
+    @Transactional
+    public void decreaseParticipantCount(Long groupBuyId) {
+        GroupBuy groupBuy = groupBuyRepository.findByIdForParticipantCountUpdate(groupBuyId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.GROUPBUY_NOT_FOUND));
+
+        groupBuy.decreaseParticipantCount();
+    }
 }

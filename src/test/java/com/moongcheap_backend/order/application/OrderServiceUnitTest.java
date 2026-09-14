@@ -77,6 +77,8 @@ class OrderServiceUnitTest {
     @DisplayName("자동 주문 정상 테스트")
     class AutoCreateOrderTest {
 
+        private GroupBuy preparedGroupBuy;
+
         @Test
         void 수요_40건을_주문으로_변환해_20건씩_나누어_저장한다() {
             List<Demand> demands = createDemands(40);
@@ -241,6 +243,7 @@ class OrderServiceUnitTest {
             assertThat(batches.get(0)).hasSize(20);
             assertThat(batches.get(1)).hasSize(19);
             assertThat(batches.stream().flatMap(List::stream)).hasSize(39);
+            verify(preparedGroupBuy).increaseParticipantCount(39);
         }
 
         private List<Demand> createDemands(int count) {
@@ -258,6 +261,7 @@ class OrderServiceUnitTest {
 
         private Product prepareOrderSource(List<Demand> demands) {
             GroupBuy groupBuy = org.mockito.Mockito.mock(GroupBuy.class);
+            preparedGroupBuy = groupBuy;
             Seller seller = org.mockito.Mockito.mock(Seller.class);
             Product product = org.mockito.Mockito.mock(Product.class);
 
@@ -356,6 +360,7 @@ class OrderServiceUnitTest {
                 .singleElement()
                 .extracting(Orders::getMemberId)
                 .isEqualTo(1L);
+            verify(preparedGroupBuy).increaseParticipantCount(1);
         }
 
         @Test
@@ -388,6 +393,7 @@ class OrderServiceUnitTest {
             orderService.autoCreateOrder(10L);
 
             verify(ordersRepository, never()).saveAll(any());
+            verify(groupBuy).increaseParticipantCount(0);
         }
 
         @Test
@@ -410,6 +416,7 @@ class OrderServiceUnitTest {
                 .singleElement()
                 .extracting(Orders::getMemberId)
                 .isEqualTo(1L);
+            verify(preparedGroupBuy).increaseParticipantCount(1);
         }
 
         @Test
@@ -648,12 +655,16 @@ class OrderServiceUnitTest {
         @Test
         void 결제대기_주문을_취소한다() {
             Orders order = org.mockito.Mockito.mock(Orders.class);
+            GroupBuy groupBuy = org.mockito.Mockito.mock(GroupBuy.class);
             when(ordersRepository.findByOrderNoAndMemberId(ORDER_NO, MEMBER_ID))
                 .thenReturn(Optional.of(order));
             when(order.getOrderStatus()).thenReturn(OrderStatus.PAYMENT_PENDING);
+            when(order.getGroupBuy()).thenReturn(groupBuy);
+            when(groupBuy.getId()).thenReturn(10L);
 
             orderService.orderCancel(MEMBER_ID, ORDER_NO);
 
+            verify(groupBuyPublicService).decreaseParticipantCount(10L);
             verify(order).setOrderStatus(OrderStatus.CANCELED);
         }
 
@@ -666,6 +677,7 @@ class OrderServiceUnitTest {
 
             orderService.orderCancel(MEMBER_ID, ORDER_NO);
 
+            verify(groupBuyPublicService, never()).decreaseParticipantCount(any());
             verify(order, never()).setOrderStatus(any());
         }
     }

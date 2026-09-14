@@ -7,7 +7,7 @@ public record GroupBuyDetailResponse(
     String title, //판매 페이지 이름
     String imageUrl, //상품 이미지
     Integer price, //상품 가격
-    Integer target_count, //목표 인원수
+    Integer targetCount, //목표 인원수
     ProductInfo productInfo
 ) {
 

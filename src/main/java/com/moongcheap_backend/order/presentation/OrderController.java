@@ -79,4 +79,6 @@ public class OrderController {
         DELIVERED,
         COMPLETED
     }
+
+    //구매 확정
 }

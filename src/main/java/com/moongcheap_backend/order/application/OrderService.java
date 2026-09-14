@@ -115,6 +115,9 @@ public class OrderService {
             int toIndex = Math.min(fromIndex + ORDER_BATCH_SIZE, orders.size());
             ordersRepository.saveAll(orders.subList(fromIndex, toIndex));
         }
+
+        // 실제 주문으로 생성된 수요만 공동구매 참여 인원에 반영한다.
+        groupBuy.increaseParticipantCount(orders.size());
         return null;
     }
 
@@ -217,6 +220,9 @@ public class OrderService {
             throw new BusinessException(ErrorCode.ORDER_CANNOT_CANCEL);
         }
 
+        //결제된것 환불
+
+        groupBuyPublicService.decreaseParticipantCount(order.getGroupBuy().getId());
         order.setOrderStatus(OrderStatus.CANCELED);
     }
 
