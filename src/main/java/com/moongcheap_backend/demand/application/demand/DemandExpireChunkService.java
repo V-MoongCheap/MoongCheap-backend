@@ -3,6 +3,7 @@ package com.moongcheap_backend.demand.application.demand;
 import com.moongcheap_backend.common.lock.AdvisoryLockAdaptor;
 import com.moongcheap_backend.common.lock.AdvisoryLockKeys;
 import com.moongcheap_backend.demand.infrastructure.demand.DemandRepository;
+import io.github.resilience4j.retry.annotation.Retry;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,8 @@ public class DemandExpireChunkService {
     private final AdvisoryLockAdaptor advisoryLockAdaptor;
     private final DemandRepository demandRepository;
 
+    //todo: error logging
+    @Retry(name = "chunkRetry")
     @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 10)
     public Optional<Integer> expireChunk(LocalDateTime threshold, int chunkSize) {
         if (!advisoryLockAdaptor.tryAcquireXactLock(AdvisoryLockKeys.DEMAND_EXPIRE_BATCH)) {

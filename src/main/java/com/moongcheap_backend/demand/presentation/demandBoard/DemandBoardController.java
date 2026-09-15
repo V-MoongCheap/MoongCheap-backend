@@ -8,6 +8,10 @@ import com.moongcheap_backend.demand.presentation.demandBoard.dto.CatalogDemandB
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.DemandBoardDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.DemandBoardJoinRequestDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.DemandBoardListDto;
+import com.moongcheap_backend.demand.presentation.demandBoard.dto.FormationPlanRequestDto;
+import com.moongcheap_backend.demand.presentation.demandBoard.dto.FormationPlanResponseDto;
+import com.moongcheap_backend.demand.presentation.demandBoard.dto.SubstituteOfferPlanRequestDto;
+import com.moongcheap_backend.demand.presentation.demandBoard.dto.SubstituteOfferPlanResponseDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -87,5 +91,21 @@ public class DemandBoardController {
         @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
         return demandBoardService.getByCatalogId(
             sessionPrincipal.memberId(), catalogId, pageable, minPrice, maxPrice);
+    }
+
+    @Operation(summary = "수요 보드 편성 계획 적용 (내부 API)",
+        description = "AI가 결정한 demand → demand_board 편성 계획을 원자적으로 반영합니다. 내부 서비스 전용.")
+    @PostMapping("/internal/formation-plans")
+    public FormationPlanResponseDto applyFormationPlan(
+        @RequestBody @Valid FormationPlanRequestDto request) {
+        return demandBoardService.applyFormationPlan(request);
+    }
+
+    @Operation(summary = "대체 오퍼 제안 계획 적용 (내부 API)",
+        description = "AI가 결정한 대체상품 제안 계획을 반영합니다. 내부 서비스 전용.")
+    @PostMapping("/internal/substitute-offer-plans")
+    public SubstituteOfferPlanResponseDto applySubstituteOfferPlan(
+        @RequestBody @Valid SubstituteOfferPlanRequestDto request) {
+        return demandBoardService.applySubstituteOfferPlan(request);
     }
 }
