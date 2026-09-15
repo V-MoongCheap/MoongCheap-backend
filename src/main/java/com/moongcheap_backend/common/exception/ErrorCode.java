@@ -66,6 +66,7 @@ public enum ErrorCode {
     DEMAND_SUBSTITUTE_NOT_ELIGIBLE(HttpStatus.CONFLICT, "DEMAND_011", "대체 오퍼를 받을 수 없는 수요입니다."),
     DEMAND_SUBSTITUTE_ALREADY_APPLIED(HttpStatus.CONFLICT, "DEMAND_012", "이미 저장된 대체 제안입니다."),
     DEMAND_BOARD_AWARDING_INCONSISTENT(HttpStatus.CONFLICT, "DEMAND_013", "낙찰 결과와 상품 상태가 일치하지 않습니다."),
+    DEMAND_BOARD_NO_PARTICIPANT(HttpStatus.CONFLICT, "DEMAND_014", "낙찰 대상 참여 수요가 존재하지 않습니다."),
 
     // Order
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_001", "주문을 찾을 수 없습니다."),

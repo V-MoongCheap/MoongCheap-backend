@@ -4,11 +4,9 @@ import com.moongcheap_backend.product.domain.product.Product;
 import com.moongcheap_backend.product.domain.product.ProductStatus;
 import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
-import java.util.Optional;
-import com.moongcheap_backend.product.domain.product.ProductStatus;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -24,6 +22,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         ProductStatus status,
         LocalDateTime currentDateTime
     );
+
     @Query("SELECT p.id FROM Product p WHERE p.demandBoardId = :demandBoardId AND p.status = :status")
     List<Long> findIdsByDemandBoardIdAndStatus(
         @Param("demandBoardId") Long demandBoardId,
@@ -59,6 +58,18 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         + "  AND p.status = :expectedStatus")
     int transitionStatusBulkForBoard(
         @Param("ids") List<Long> ids,
+        @Param("boardId") Long boardId,
+        @Param("expectedStatus") ProductStatus expectedStatus,
+        @Param("newStatus") ProductStatus newStatus,
+        @Param("now") LocalDateTime now);
+
+    @Modifying
+    @Query("UPDATE Product p SET p.status = :newStatus, p.updatedAt = :now "
+        + "WHERE p.id = :id "
+        + "  AND p.demandBoardId = :boardId "
+        + "  AND p.status = :expectedStatus")
+    int transitionStatusForBoard(
+        @Param("id") Long id,
         @Param("boardId") Long boardId,
         @Param("expectedStatus") ProductStatus expectedStatus,
         @Param("newStatus") ProductStatus newStatus,

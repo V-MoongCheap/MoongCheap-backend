@@ -92,3 +92,5 @@ moongcheap:
       # 64자 hex 문자열(32바이트) 권장. 프로파일별 파일에서 오버라이드
       password: "${MOONGCHEAP_ENC_PASSWORD:}"
       salt: "${MOONGCHEAP_ENC_SALT:}"
+    # 내부 API 인증 키. 추후 AWS Parameter Store로 관리 예정
+    internal-api-key: "${MOONGCHEAP_INTERNAL_API_KEY:}"

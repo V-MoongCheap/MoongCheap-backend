@@ -2,6 +2,7 @@ package com.moongcheap_backend.demand.application.demandBoard;
 
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
+import com.moongcheap_backend.common.schema.InternalSchemaVersions;
 import com.moongcheap_backend.demand.domain.demand.Demand;
 import com.moongcheap_backend.demand.domain.demand.DemandStatus;
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoard;
@@ -10,8 +11,10 @@ import com.moongcheap_backend.demand.infrastructure.demand.DemandRepository;
 import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardQueryRepository;
 import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardRepository;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.AuctionResultDto;
+import com.moongcheap_backend.demand.presentation.demandBoard.dto.AwardingPendingResponseDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.AwardingResultRequestDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.AwardingResultRequestDto.BoardResult;
+import com.moongcheap_backend.demand.presentation.demandBoard.dto.AwardingResultRequestDto.Evaluation;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.AwardingResultResponseDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.CatalogDemandBoardListDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.DemandBoardDto;
@@ -28,6 +31,7 @@ import com.moongcheap_backend.demand.presentation.demandBoard.dto.FormationPlanR
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.SubstituteOfferPlanRequestDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.SubstituteOfferPlanRequestDto.Proposal;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.SubstituteOfferPlanResponseDto;
+import com.moongcheap_backend.groupbuy.application.GroupBuyService;
 import com.moongcheap_backend.product.domain.product.ProductStatus;
 import com.moongcheap_backend.product.domain.productAwardEvaluation.ProductAwardEvaluation;
 import com.moongcheap_backend.product.infrastructure.product.ProductRepository;
@@ -38,10 +42,12 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -59,6 +65,7 @@ public class DemandBoardService {
     private final DemandRepository demandRepository;
     private final ProductAwardEvaluationRepository productAwardEvaluationRepository;
     private final ProductRepository productRepository;
+    private final GroupBuyService groupBuyService;
 
     @Lazy
     @Autowired
@@ -109,6 +116,16 @@ public class DemandBoardService {
             .orElseThrow(() -> new BusinessException(ErrorCode.DEMAND_BOARD_NOT_FOUND));
     }
 
+    @Transactional(readOnly = true)
+    public AwardingPendingResponseDto getPendingAwarding(Pageable pageable) {
+        return AwardingPendingResponseDto.of(
+            InternalSchemaVersions.AWARDING_PENDING,
+            LocalDateTime.now(),
+            demandBoardQueryRepository.getPendingAwardingBoards(pageable),
+            pageable
+        );
+    }
+
     @Transactional
     public Long join(Long memberId, Long demandBoardId, DemandBoardJoinRequestDto request) {
         DemandBoard demandBoard = demandBoardRepository.findByIdAndStatusInForUpdate(demandBoardId,
@@ -140,7 +157,6 @@ public class DemandBoardService {
         return demand.getId();
     }
 
-    @Transactional
     public FormationPlanResponseDto applyFormationPlan(FormationPlanRequestDto request) {
         LocalDateTime now = LocalDateTime.now();
 
@@ -155,6 +171,10 @@ public class DemandBoardService {
                 staleCount += size;
                 log.warn("Existing assignment stale: boardId={}, demandIds={}",
                     assignment.demandBoardId(), assignment.demandIds());
+            } catch (DataAccessException e) {
+                staleCount += 1;
+                log.error("Cluster failed with data exception: boardId={}, demandIds={}",
+                    assignment.demandBoardId(), assignment.demandIds(), e);
             }
         }
 
@@ -180,7 +200,7 @@ public class DemandBoardService {
         );
     }
 
-    @Transactional(propagation = Propagation.NESTED)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void applyExistingAssignment(ExistingBoardAssignment assignment, LocalDateTime now) {
         List<Long> demandIds = assignment.demandIds();
         int updated = demandRepository.assignToExistingBoard(
@@ -190,7 +210,7 @@ public class DemandBoardService {
         }
     }
 
-    @Transactional(propagation = Propagation.NESTED)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Long createNewBoard(FormationPlanRequestDto.NewBoard newBoard, LocalDateTime now) {
         DemandBoard saved = demandBoardRepository.save(newBoard.toEntity());
         int updated = demandRepository.assignToBoard(
@@ -202,7 +222,7 @@ public class DemandBoardService {
         return saved.getId();
     }
 
-    @Transactional
+
     public SubstituteOfferPlanResponseDto applySubstituteOfferPlan(
         SubstituteOfferPlanRequestDto request) {
         int appliedCount = 0;
@@ -229,8 +249,17 @@ public class DemandBoardService {
                         log.warn("Substitute offer stale: demandId={}, boardId={}, code={}",
                             proposal.demandId(), proposal.demandBoardId(), e.getErrorCode());
                     }
-                    default -> throw e;
+                    default -> {
+                        log.error(
+                            "Substitute offer failed with unexpected BusinessException: demandId={}, code={}",
+                            proposal.demandId(), e.getErrorCode(), e);
+                        throw e;
+                    }
                 }
+            } catch (DataAccessException e) {
+                staleRejectedCount += 1;
+                log.error("Substitute offer failed with data exception: demandId={}, boardId={}",
+                    proposal.demandId(), proposal.demandBoardId(), e);
             }
         }
         return new SubstituteOfferPlanResponseDto(
@@ -241,7 +270,7 @@ public class DemandBoardService {
         );
     }
 
-    @Transactional(propagation = Propagation.NESTED)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void substituteOffer(
         Long demandId,
         Long demandBoardId,
@@ -268,7 +297,6 @@ public class DemandBoardService {
         demand.substituteOffer(demandBoardId);
     }
 
-    @Transactional
     public AwardingResultResponseDto applyAwardingResult(AwardingResultRequestDto request) {
         int appliedCount = 0;
         int staleRejectedCount = 0;
@@ -280,13 +308,22 @@ public class DemandBoardService {
                 switch (e.getErrorCode()) {
                     case DEMAND_BOARD_NOT_FOUND,
                          DEMAND_BOARD_AWARDING_INCONSISTENT,
-                         DEMAND_NOT_FOUND -> {
+                         DEMAND_BOARD_NO_PARTICIPANT -> {
                         staleRejectedCount += 1;
                         log.warn("Awarding stale: boardId={}, code={}, message={}",
                             boardResult.boardId(), e.getErrorCode(), e.getMessage());
                     }
-                    default -> throw e;
+                    default -> {
+                        log.error(
+                            "Awarding failed with unexpected BusinessException: boardId={}, code={}",
+                            boardResult.boardId(), e.getErrorCode(), e);
+                        throw e;
+                    }
                 }
+            } catch (DataAccessException e) {
+                staleRejectedCount += 1;
+                log.error("Awarding failed with data exception: boardId={}",
+                    boardResult.boardId(), e);
             }
         }
         log.info("Awarding applied: total={}, applied={}, stale={}",
@@ -298,19 +335,27 @@ public class DemandBoardService {
         );
     }
 
-    @Transactional(propagation = Propagation.NESTED)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void award(BoardResult boardResult) {
         LocalDateTime now = LocalDateTime.now();
 
-        List<Long> winnerIds = boardResult.evaluations().stream()
-            .filter(e -> Boolean.TRUE.equals(e.isAwarded()))
-            .map(AwardingResultRequestDto.Evaluation::productId)
-            .toList();
-        List<Long> loserIds = boardResult.evaluations().stream()
-            .filter(e -> !Boolean.TRUE.equals(e.isAwarded()))
-            .map(AwardingResultRequestDto.Evaluation::productId)
-            .toList();
-        boolean isUnawarded = winnerIds.isEmpty();
+        Optional<Long> winnerId = Optional.empty();
+        List<Long> loserIds = new ArrayList<>();
+        for (Evaluation evaluation : nullSafe(boardResult.evaluations())) {
+            if (Boolean.TRUE.equals(evaluation.isAwarded())) {
+                winnerId = Optional.of(evaluation.productId());
+            } else {
+                loserIds.add(evaluation.productId());
+            }
+        }
+        transactionBoardAndDemands(winnerId.isEmpty(), boardResult, now);
+        transitionProducts(winnerId, loserIds, boardResult, now);
+        productAwardEvaluationRepository.saveAll(fromBoardResult(boardResult));
+        winnerId.ifPresent(groupBuyService::createGroupBuy);
+    }
+
+    private void transactionBoardAndDemands(boolean isUnawarded, BoardResult boardResult,
+        LocalDateTime now) {
         int demandBoardMarked = demandBoardRepository.markAwarded(
             boardResult.boardId(),
             DemandBoardStatus.GB_AWARDING,
@@ -331,12 +376,20 @@ public class DemandBoardService {
             now
         );
         if (demandMarked == 0) {
-            throw new BusinessException(ErrorCode.DEMAND_NOT_FOUND);
+            throw new BusinessException(ErrorCode.DEMAND_BOARD_NO_PARTICIPANT);
         }
-        int winnerUpdated = winnerIds.isEmpty() ? 0
-            : productRepository.transitionStatusBulkForBoard(
-                winnerIds, boardResult.boardId(),
-                ProductStatus.AWARDING, ProductStatus.AWARDED, now);
+    }
+
+    private void transitionProducts(
+        Optional<Long> winnerId,
+        List<Long> loserIds,
+        BoardResult boardResult,
+        LocalDateTime now
+    ) {
+        int winnerUpdated = winnerId.map(id ->
+            productRepository.transitionStatusForBoard(
+                id, boardResult.boardId(),
+                ProductStatus.AWARDING, ProductStatus.AWARDED, now)).orElse(0);
         int loserUpdated = loserIds.isEmpty() ? 0
             : productRepository.transitionStatusBulkForBoard(
                 loserIds, boardResult.boardId(),
@@ -345,8 +398,10 @@ public class DemandBoardService {
         if (winnerUpdated + loserUpdated != boardResult.evaluations().size()) {
             throw new BusinessException(ErrorCode.DEMAND_BOARD_AWARDING_INCONSISTENT);
         }
+    }
 
-        List<ProductAwardEvaluation> productAwardEvaluation = boardResult.evaluations()
+    private List<ProductAwardEvaluation> fromBoardResult(BoardResult boardResult) {
+        return boardResult.evaluations()
             .stream().map(
                 evaluation -> ProductAwardEvaluation.builder()
                     .isAwarded(evaluation.isAwarded())
@@ -357,7 +412,6 @@ public class DemandBoardService {
                     .judgedAt(boardResult.judgedAt())
                     .build()
             ).toList();
-        productAwardEvaluationRepository.saveAll(productAwardEvaluation);
     }
 
     private static <T> List<T> nullSafe(List<T> list) {

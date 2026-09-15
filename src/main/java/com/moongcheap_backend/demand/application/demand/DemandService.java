@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -55,8 +56,12 @@ public class DemandService {
             .extraRequirement(request.extraRequirement())
             .isSubstitutable(request.isSubstitutable())
             .build();
+        try {
+            return demandRepository.save(demand).getId();
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.DEMAND_ALREADY_EXISTS);
+        }
 
-        return demandRepository.save(demand).getId();
     }
 
     private static final List<DemandStatus> ACTIVE_STATUSES = List.of(
