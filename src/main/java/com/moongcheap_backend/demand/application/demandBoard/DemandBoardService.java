@@ -175,6 +175,16 @@ public class DemandBoardService {
                 staleCount += 1;
                 log.error("Cluster failed with data exception: boardId={}, demandIds={}",
                     assignment.demandBoardId(), assignment.demandIds(), e);
+            } catch (RuntimeException e) {
+                // 심각한 오류입니다. 이후 알림이 추가될 시 이 부분에 log 알림을 붙여야 합니다
+                // metrix가 있다면 해당 부분에 붙이는것도 좋아 보입니다.
+                staleCount += size;
+                log.error(
+                    "Existing assignment failed with unexpected runtime exception: "
+                        + "boardId={}, demandIds={}",
+                    assignment.demandBoardId(),
+                    assignment.demandIds(),
+                    e);
             }
         }
 
@@ -253,13 +263,24 @@ public class DemandBoardService {
                         log.error(
                             "Substitute offer failed with unexpected BusinessException: demandId={}, code={}",
                             proposal.demandId(), e.getErrorCode(), e);
-                        throw e;
                     }
                 }
             } catch (DataAccessException e) {
                 staleRejectedCount += 1;
                 log.error("Substitute offer failed with data exception: demandId={}, boardId={}",
                     proposal.demandId(), proposal.demandBoardId(), e);
+            } catch (RuntimeException e) {
+                // 심각한 오류입니다. 이후 알림이 추가될 시 이 부분에 log 알림을 붙여야 합니다
+                // metrix가 있다면 해당 부분에 붙이는것도 좋아 보입니다.
+                staleRejectedCount += 1;
+                log.error(
+                    "Substitute offer failed with unexpected runtime exception: "
+                        + "demandId={}, boardId={}, expectedCatalogId={}, substituteCatalogId={}",
+                    proposal.demandId(),
+                    proposal.demandBoardId(),
+                    proposal.expectedOriginalCatalogId(),
+                    proposal.substituteCatalogId(),
+                    e);
             }
         }
         return new SubstituteOfferPlanResponseDto(
@@ -317,13 +338,20 @@ public class DemandBoardService {
                         log.error(
                             "Awarding failed with unexpected BusinessException: boardId={}, code={}",
                             boardResult.boardId(), e.getErrorCode(), e);
-                        throw e;
                     }
                 }
             } catch (DataAccessException e) {
                 staleRejectedCount += 1;
                 log.error("Awarding failed with data exception: boardId={}",
                     boardResult.boardId(), e);
+            } catch (RuntimeException e) {
+                // 심각한 오류입니다. 이후 알림이 추가될 시 이 부분에 log 알림을 붙여야 합니다
+                // metrix가 있다면 해당 부분에 붙이는것도 좋아 보입니다.
+                staleRejectedCount += 1;
+                log.error(
+                    "Awarding failed with unexpected runtime exception: boardId={}",
+                    boardResult.boardId(),
+                    e);
             }
         }
         log.info("Awarding applied: total={}, applied={}, stale={}",
