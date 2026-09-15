@@ -60,13 +60,20 @@ public interface DemandRepository extends JpaRepository<Demand, Long> {
 
     @Modifying
     @Query(value = """
+        WITH locked_demands AS (
+            SELECT id
+              FROM demand
+             WHERE id IN (:demandIds)
+               AND status = 'UNASSIGNED'
+             ORDER BY id
+             FOR UPDATE
+        )
         UPDATE demand
            SET status = 'ASSIGNED',
                demand_board_id = :boardId,
                desire_end_at = :desireEndAt,
                updated_at = :updatedAt
-         WHERE id IN (:demandIds)
-           AND status = 'UNASSIGNED'
+         WHERE id IN (SELECT id FROM locked_demands)
         """, nativeQuery = true)
     int assignToBoard(
         @Param("boardId") Long boardId,
@@ -81,14 +88,21 @@ public interface DemandRepository extends JpaRepository<Demand, Long> {
                SET participant_count = participant_count + :count
              WHERE id = :boardId AND status = 'GB_GATHERING'
             RETURNING sale_end_at
+        ),
+        locked_demands AS (
+            SELECT id
+              FROM demand
+             WHERE id IN (:demandIds)
+               AND status = 'UNASSIGNED'
+             ORDER BY id
+             FOR UPDATE
         )
         UPDATE demand
            SET status = 'ASSIGNED',
                demand_board_id = :boardId,
                desire_end_at = (SELECT sale_end_at FROM board_update),
                updated_at = :updatedAt
-         WHERE id IN (:demandIds)
-           AND status = 'UNASSIGNED'
+         WHERE id IN (SELECT id FROM locked_demands)
            AND EXISTS (SELECT 1 FROM board_update)
         """, nativeQuery = true)
     int assignToExistingBoard(

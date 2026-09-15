@@ -241,7 +241,7 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
         FROM demand_board db
         WHERE db.status = 'GB_AWARDING'
         ORDER BY db.updated_at ASC, db.id ASC
-        LIMIT :limit OFFSET :offset
+        LIMIT :limit
         """;
 
     private static final String PENDING_AWARDING_PRODUCTS_QUERY = """
@@ -258,13 +258,10 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
         """;
 
     @Override
-    public List<AwardingPendingResponseDto.Board> getPendingAwardingBoards(Pageable pageable) {
+    public List<AwardingPendingResponseDto.Board> getPendingAwardingBoards(int fetchSize) {
         List<PendingBoardRow> boardRows = jdbcTemplate.query(
             PENDING_AWARDING_BOARDS_QUERY,
-            Map.of(
-                "limit", pageable.getPageSize() + 1,
-                "offset", pageable.getOffset()
-            ),
+            Map.of("limit", fetchSize),
             (rs, rowNum) -> new PendingBoardRow(
                 rs.getLong("board_id"),
                 rs.getLong("catalog_id"),

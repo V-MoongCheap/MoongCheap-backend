@@ -32,7 +32,8 @@ public class DemandBoardCancelScheduler {
             Optional<Integer> result = chunkService.cancelChunk(threshold, CHUNK_SIZE);
 
             if (result.isEmpty()) {
-                log.info("Demand board cancel batch preempted: lock held elsewhere, total={}", total);
+                log.info("Demand board cancel batch preempted: lock held elsewhere, total={}",
+                    total);
                 return;
             }
             int updated = result.get();
@@ -43,7 +44,7 @@ public class DemandBoardCancelScheduler {
             }
         }
 
-        log.info("Demand board cancel batch finished: canceled={}, chunks={}, elapsedMs={}",
+        log.info("Demand board cancel batch finished: processed={}, chunks={}, elapsedMs={}",
             total, chunks, System.currentTimeMillis() - start);
     }
 }

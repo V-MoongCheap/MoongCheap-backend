@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,7 +21,12 @@ import lombok.NoArgsConstructor;
 public class ProductAwardEvaluation {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "product_award_evaluation_seq")
+    @SequenceGenerator(
+        name = "product_award_evaluation_seq",
+        sequenceName = "product_award_evaluation_id_seq",
+        allocationSize = 20
+    )
     private Long id;
 
     @Column(name = "product_id", nullable = false, unique = true)

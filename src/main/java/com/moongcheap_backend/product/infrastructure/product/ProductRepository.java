@@ -43,25 +43,66 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     }
 
     @Modifying
-    @Query("UPDATE Product p SET p.status = :newStatus, p.updatedAt = :now "
-        + "WHERE p.id IN :ids AND p.status = :expectedStatus")
+    @Query(value = """
+        WITH locked_products AS (
+            SELECT id
+              FROM product
+             WHERE id IN (:ids)
+               AND status = :expectedStatus
+             ORDER BY id
+             FOR UPDATE
+        )
+        UPDATE product
+           SET status = :newStatus,
+               updated_at = :now
+         WHERE id IN (SELECT id FROM locked_products)
+        """, nativeQuery = true)
     int transitionStatusBulk(
         @Param("ids") List<Long> ids,
-        @Param("expectedStatus") ProductStatus expectedStatus,
-        @Param("newStatus") ProductStatus newStatus,
+        @Param("expectedStatus") String expectedStatus,
+        @Param("newStatus") String newStatus,
         @Param("now") LocalDateTime now);
 
+    default int transitionStatusBulk(
+        List<Long> ids,
+        ProductStatus expectedStatus,
+        ProductStatus newStatus,
+        LocalDateTime now) {
+        return transitionStatusBulk(ids, expectedStatus.name(), newStatus.name(), now);
+    }
+
     @Modifying
-    @Query("UPDATE Product p SET p.status = :newStatus, p.updatedAt = :now "
-        + "WHERE p.id IN :ids "
-        + "  AND p.demandBoardId = :boardId "
-        + "  AND p.status = :expectedStatus")
+    @Query(value = """
+        WITH locked_products AS (
+            SELECT id
+              FROM product
+             WHERE id IN (:ids)
+               AND demand_board_id = :boardId
+               AND status = :expectedStatus
+             ORDER BY id
+             FOR UPDATE
+        )
+        UPDATE product
+           SET status = :newStatus,
+               updated_at = :now
+         WHERE id IN (SELECT id FROM locked_products)
+        """, nativeQuery = true)
     int transitionStatusBulkForBoard(
         @Param("ids") List<Long> ids,
         @Param("boardId") Long boardId,
-        @Param("expectedStatus") ProductStatus expectedStatus,
-        @Param("newStatus") ProductStatus newStatus,
+        @Param("expectedStatus") String expectedStatus,
+        @Param("newStatus") String newStatus,
         @Param("now") LocalDateTime now);
+
+    default int transitionStatusBulkForBoard(
+        List<Long> ids,
+        Long boardId,
+        ProductStatus expectedStatus,
+        ProductStatus newStatus,
+        LocalDateTime now) {
+        return transitionStatusBulkForBoard(
+            ids, boardId, expectedStatus.name(), newStatus.name(), now);
+    }
 
     @Modifying
     @Query("UPDATE Product p SET p.status = :newStatus, p.updatedAt = :now "

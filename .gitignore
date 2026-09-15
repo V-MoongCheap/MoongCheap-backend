@@ -50,6 +50,9 @@ docs/formation-plan-orphan-board-analysis.md
 docs/nested-to-requires-new-migration-decision.md
 docs/nested-transaction-substitute-offer-analysis.md
 docs/retry-and-logging.md
+docs/demand-board-service-chunk-refactoring.md
+docs/identity-to-sequence-decision.md
+docs/demand-board-refactoring-full-log.md
 
 ### Environment ###
 .env

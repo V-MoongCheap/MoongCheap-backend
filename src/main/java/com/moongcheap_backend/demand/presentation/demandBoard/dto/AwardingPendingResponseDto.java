@@ -2,26 +2,24 @@ package com.moongcheap_backend.demand.presentation.demandBoard.dto;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import org.springframework.data.domain.Pageable;
 
 public record AwardingPendingResponseDto(
     String schemaVersion,
     LocalDateTime fetchedAt,
     List<Board> boards,
     int size,
-    boolean hasNext,
-    int page
+    boolean hasNext
 ) {
 
     public static AwardingPendingResponseDto of(
         String schemaVersion,
         LocalDateTime fetchedAt,
         List<Board> fetched,
-        Pageable pageable) {
-        boolean hasNext = fetched.size() > pageable.getPageSize();
-        List<Board> boards = hasNext ? fetched.subList(0, pageable.getPageSize()) : fetched;
+        int size) {
+        boolean hasNext = fetched.size() > size;
+        List<Board> boards = hasNext ? fetched.subList(0, size) : fetched;
         return new AwardingPendingResponseDto(
-            schemaVersion, fetchedAt, boards, boards.size(), hasNext, pageable.getPageNumber());
+            schemaVersion, fetchedAt, boards, boards.size(), hasNext);
     }
 
     public record Board(

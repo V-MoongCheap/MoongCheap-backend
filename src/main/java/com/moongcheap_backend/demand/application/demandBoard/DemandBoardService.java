@@ -7,6 +7,8 @@ import com.moongcheap_backend.demand.domain.demand.Demand;
 import com.moongcheap_backend.demand.domain.demand.DemandStatus;
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoard;
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoardStatus;
+import com.moongcheap_backend.demand.infrastructure.demand.DemandBatchRepository;
+import com.moongcheap_backend.demand.infrastructure.demand.DemandBatchRepository.AssignToBoardArgs;
 import com.moongcheap_backend.demand.infrastructure.demand.DemandRepository;
 import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardQueryRepository;
 import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardRepository;
@@ -23,6 +25,7 @@ import com.moongcheap_backend.demand.presentation.demandBoard.dto.DemandBoardLis
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.DemandBoardSummaryDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.FormationPlanRequestDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.FormationPlanRequestDto.ExistingBoardAssignment;
+import com.moongcheap_backend.demand.presentation.demandBoard.dto.FormationPlanRequestDto.NewBoard;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.FormationPlanResponseDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.FormationPlanResponseDto.ExistingAssignments;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.FormationPlanResponseDto.NewBoardResult;
@@ -40,9 +43,12 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +69,7 @@ public class DemandBoardService {
     private final DemandBoardRepository demandBoardRepository;
     private final DemandBoardQueryRepository demandBoardQueryRepository;
     private final DemandRepository demandRepository;
+    private final DemandBatchRepository demandBatchRepository;
     private final ProductAwardEvaluationRepository productAwardEvaluationRepository;
     private final ProductRepository productRepository;
     private final GroupBuyService groupBuyService;
@@ -117,12 +124,12 @@ public class DemandBoardService {
     }
 
     @Transactional(readOnly = true)
-    public AwardingPendingResponseDto getPendingAwarding(Pageable pageable) {
+    public AwardingPendingResponseDto getPendingAwarding(int size) {
         return AwardingPendingResponseDto.of(
             InternalSchemaVersions.AWARDING_PENDING,
             LocalDateTime.now(),
-            demandBoardQueryRepository.getPendingAwardingBoards(pageable),
-            pageable
+            demandBoardQueryRepository.getPendingAwardingBoards(size + 1),
+            size
         );
     }
 
@@ -157,79 +164,120 @@ public class DemandBoardService {
         return demand.getId();
     }
 
+    private static final int FORMATION_PLAN_CHUNK_SIZE = 10;
+
+    //완료
     public FormationPlanResponseDto applyFormationPlan(FormationPlanRequestDto request) {
         LocalDateTime now = LocalDateTime.now();
-
-        int appliedCount = 0;
-        int staleCount = 0;
-        for (ExistingBoardAssignment assignment : nullSafe(request.existingBoardAssignments())) {
-            int size = assignment.demandIds().size();
-            try {
-                self.applyExistingAssignment(assignment, now);
-                appliedCount += size;
-            } catch (StaleFormationItemException e) {
-                staleCount += size;
-                log.warn("Existing assignment stale: boardId={}, demandIds={}",
-                    assignment.demandBoardId(), assignment.demandIds());
-            } catch (DataAccessException e) {
-                staleCount += 1;
-                log.error("Cluster failed with data exception: boardId={}, demandIds={}",
-                    assignment.demandBoardId(), assignment.demandIds(), e);
-            } catch (RuntimeException e) {
-                // 심각한 오류입니다. 이후 알림이 추가될 시 이 부분에 log 알림을 붙여야 합니다
-                // metrix가 있다면 해당 부분에 붙이는것도 좋아 보입니다.
-                staleCount += size;
-                log.error(
-                    "Existing assignment failed with unexpected runtime exception: "
-                        + "boardId={}, demandIds={}",
-                    assignment.demandBoardId(),
-                    assignment.demandIds(),
-                    e);
-            }
-        }
-
-        List<NewBoardResult> newBoardResults = new ArrayList<>();
-        for (FormationPlanRequestDto.NewBoard newBoard : nullSafe(request.newBoards())) {
-            try {
-                Long boardId = self.createNewBoard(newBoard, now);
-                newBoardResults.add(
-                    new NewBoardResult(newBoard.clientBoardKey(), boardId, NewBoardStatus.CREATED));
-            } catch (StaleFormationItemException e) {
-                newBoardResults.add(
-                    new NewBoardResult(newBoard.clientBoardKey(), null,
-                        NewBoardStatus.STALE_REJECTED));
-                log.warn("New board stale: clientBoardKey={}, demandIds={}",
-                    newBoard.clientBoardKey(), newBoard.demandIds());
-            }
-        }
-
         return new FormationPlanResponseDto(
             Status.APPLIED,
-            new ExistingAssignments(appliedCount, staleCount),
-            newBoardResults
+            applyExistAssignments(request, now),
+            createNewBoard(request, now)
         );
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void applyExistingAssignment(ExistingBoardAssignment assignment, LocalDateTime now) {
-        List<Long> demandIds = assignment.demandIds();
-        int updated = demandRepository.assignToExistingBoard(
-            assignment.demandBoardId(), demandIds.size(), now, demandIds);
-        if (updated != demandIds.size()) {
-            throw new StaleFormationItemException();
+    private ExistingAssignments applyExistAssignments(
+        FormationPlanRequestDto request,
+        LocalDateTime now) {
+        int appliedCount = 0;
+        int staleCount = 0;
+        for (List<ExistingBoardAssignment> assignmentChunk : chunk(
+            request.existingBoardAssignments(),
+            Comparator.comparing(ExistingBoardAssignment::demandBoardId))) {
+            int chunkDemandTotal = assignmentChunk.stream()
+                .mapToInt(a -> a.demandIds().size())
+                .sum();
+            try {
+                self.applyExistingAssignmentChunk(assignmentChunk, now);
+                appliedCount += chunkDemandTotal;
+            } catch (StaleFormationItemException e) {
+                staleCount += chunkDemandTotal;
+                log.warn("Existing assignment chunk stale: assignments={}", assignmentChunk);
+            } catch (DataAccessException e) {
+                staleCount += chunkDemandTotal;
+                log.error("Existing assignment chunk failed with data exception: assignments={}",
+                    assignmentChunk, e);
+            } catch (RuntimeException e) {
+                // 심각한 오류입니다. 이후 알림이 추가될 시 이 부분에 log 알림을 붙여야 합니다
+                // metrix가 있다면 해당 부분에 붙이는것도 좋아 보입니다.
+                staleCount += chunkDemandTotal;
+                log.error(
+                    "Existing assignment chunk failed with unexpected runtime exception: "
+                        + "assignments={}", assignmentChunk, e);
+            }
+        }
+        return new ExistingAssignments(appliedCount, staleCount);
+    }
+
+    private List<NewBoardResult> createNewBoard(
+        FormationPlanRequestDto request, LocalDateTime now) {
+        List<NewBoardResult> newBoardResults = new ArrayList<>();
+        for (List<FormationPlanRequestDto.NewBoard> newBoardList : chunk(
+            request.newBoards(),
+            Comparator.comparing(nb -> Collections.min(nb.demandIds()))
+        )) {
+            try {
+                newBoardResults.addAll(self.createNewBoardChunk(newBoardList, now));
+            } catch (StaleFormationItemException e) {
+                addRejected(newBoardResults, newBoardList);
+                log.warn("New board chunk stale: {}", newBoardList);
+            } catch (DataAccessException e) {
+                addRejected(newBoardResults, newBoardList);
+                log.error("New board chunk failed with data exception: {}", newBoardList, e);
+            } catch (RuntimeException e) {
+                // 심각한 오류입니다. 이후 알림이 추가될 시 이 부분에 log 알림을 붙여야 합니다
+                // metrix가 있다면 해당 부분에 붙이는것도 좋아 보입니다.
+                addRejected(newBoardResults, newBoardList);
+                log.error("New board chunk failed with unexpected runtime exception: {}",
+                    newBoardList, e);
+            }
+        }
+        return newBoardResults;
+    }
+
+    private void addRejected(List<NewBoardResult> results, List<NewBoard> chunk) {
+        for (NewBoard nb : chunk) {
+            results.add(new NewBoardResult(
+                nb.clientBoardKey(), null, NewBoardStatus.STALE_REJECTED));
         }
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public Long createNewBoard(FormationPlanRequestDto.NewBoard newBoard, LocalDateTime now) {
-        DemandBoard saved = demandBoardRepository.save(newBoard.toEntity());
-        int updated = demandRepository.assignToBoard(
-            saved.getId(), saved.getSaleEndAt(), now, newBoard.demandIds());
-        if (updated != newBoard.demandIds().size()) {
-            entityManager.detach(saved);
-            throw new StaleFormationItemException();
+    public void applyExistingAssignmentChunk(List<ExistingBoardAssignment> assignments,
+        LocalDateTime now) {
+        int[] updateCounts = demandBatchRepository.batchAssignToExistingBoard(assignments, now);
+        for (int i = 0; i < updateCounts.length; i++) {
+            if (updateCounts[i] != assignments.get(i).demandIds().size()) {
+                throw new StaleFormationItemException();
+            }
         }
-        return saved.getId();
+    }
+
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public List<NewBoardResult> createNewBoardChunk(
+        List<FormationPlanRequestDto.NewBoard> newBoards,
+        LocalDateTime now) {
+        List<DemandBoard> savedList = newBoards.stream()
+            .map(newBoard -> demandBoardRepository.save(newBoard.toEntity()))
+            .toList();
+        List<AssignToBoardArgs> args = IntStream.range(0, newBoards.size())
+            .mapToObj(i -> new AssignToBoardArgs(
+                savedList.get(i).getId(),
+                savedList.get(i).getSaleEndAt(),
+                newBoards.get(i).demandIds()))
+            .toList();
+        int[] updateCounts = demandBatchRepository.batchAssignToBoard(args, now);
+        List<NewBoardResult> newBoardResults = new ArrayList<>();
+        for (int i = 0; i < updateCounts.length; i++) {
+            if (updateCounts[i] != newBoards.get(i).demandIds().size()) {
+                throw new StaleFormationItemException();
+            }
+            newBoardResults.add(new NewBoardResult(
+                newBoards.get(i).clientBoardKey(), savedList.get(i).getId(), NewBoardStatus.CREATED)
+            );
+        }
+        return newBoardResults;
     }
 
 
@@ -238,49 +286,26 @@ public class DemandBoardService {
         int appliedCount = 0;
         int staleRejectedCount = 0;
         int alreadyAppliedCount = 0;
-        for (Proposal proposal : nullSafe(request.proposals())) {
+        for (List<Proposal> proposalList : chunk(
+            request.proposals(),
+            Comparator.comparing(Proposal::demandId)
+        )) {
             try {
-                self.substituteOffer(
-                    proposal.demandId(),
-                    proposal.demandBoardId(),
-                    proposal.expectedOriginalCatalogId(),
-                    proposal.substituteCatalogId());
-                appliedCount += 1;
-            } catch (BusinessException e) {
-                switch (e.getErrorCode()) {
-                    case DEMAND_SUBSTITUTE_ALREADY_APPLIED -> {
-                        alreadyAppliedCount += 1;
-                        log.info("Substitute offer already applied: demandId={}, boardId={}",
-                            proposal.demandId(), proposal.demandBoardId());
-                    }
-                    case DEMAND_BOARD_NOT_FOUND, DEMAND_NOT_FOUND,
-                         DEMAND_SUBSTITUTE_NOT_ELIGIBLE -> {
-                        staleRejectedCount += 1;
-                        log.warn("Substitute offer stale: demandId={}, boardId={}, code={}",
-                            proposal.demandId(), proposal.demandBoardId(), e.getErrorCode());
-                    }
-                    default -> {
-                        log.error(
-                            "Substitute offer failed with unexpected BusinessException: demandId={}, code={}",
-                            proposal.demandId(), e.getErrorCode(), e);
-                    }
-                }
+                SubstituteOfferChunkResult result = self.substituteOfferChunk(proposalList);
+                appliedCount += result.applied();
+                alreadyAppliedCount += result.alreadyApplied();
+                staleRejectedCount += result.staleRejected();
             } catch (DataAccessException e) {
-                staleRejectedCount += 1;
-                log.error("Substitute offer failed with data exception: demandId={}, boardId={}",
-                    proposal.demandId(), proposal.demandBoardId(), e);
+                staleRejectedCount += proposalList.size();
+                log.error("Substitute offer chunk failed with data exception: proposals={}",
+                    proposalList, e);
             } catch (RuntimeException e) {
                 // 심각한 오류입니다. 이후 알림이 추가될 시 이 부분에 log 알림을 붙여야 합니다
                 // metrix가 있다면 해당 부분에 붙이는것도 좋아 보입니다.
-                staleRejectedCount += 1;
+                staleRejectedCount += proposalList.size();
                 log.error(
-                    "Substitute offer failed with unexpected runtime exception: "
-                        + "demandId={}, boardId={}, expectedCatalogId={}, substituteCatalogId={}",
-                    proposal.demandId(),
-                    proposal.demandBoardId(),
-                    proposal.expectedOriginalCatalogId(),
-                    proposal.substituteCatalogId(),
-                    e);
+                    "Substitute offer chunk failed with unexpected runtime exception: proposals={}",
+                    proposalList, e);
             }
         }
         return new SubstituteOfferPlanResponseDto(
@@ -292,7 +317,48 @@ public class DemandBoardService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void substituteOffer(
+    public SubstituteOfferChunkResult substituteOfferChunk(
+        List<Proposal> proposalList
+    ) {
+        int applied = 0;
+        int alreadyApplied = 0;
+        int staleRejected = 0;
+        for (Proposal proposal : proposalList) {
+            try {
+                substituteOffer(
+                    proposal.demandId(),
+                    proposal.demandBoardId(),
+                    proposal.expectedOriginalCatalogId(),
+                    proposal.substituteCatalogId()
+                );
+                applied++;
+            } catch (BusinessException e) {
+                switch (e.getErrorCode()) {
+                    case DEMAND_SUBSTITUTE_ALREADY_APPLIED -> {
+                        // 이미 적용된 상태는 no-op success로 취급, chunk 롤백 없이 계속 진행
+                        alreadyApplied++;
+                        log.info("Substitute offer already applied: demandId={}, boardId={}",
+                            proposal.demandId(), proposal.demandBoardId());
+                    }
+                    case DEMAND_BOARD_NOT_FOUND, DEMAND_NOT_FOUND,
+                         DEMAND_SUBSTITUTE_NOT_ELIGIBLE -> {
+                        // 상태 변경 이전에 던져지는 예외이므로 다른 proposal에 영향 없음
+                        staleRejected++;
+                        log.warn("Substitute offer stale: demandId={}, boardId={}, code={}",
+                            proposal.demandId(), proposal.demandBoardId(), e.getErrorCode());
+                    }
+                    default -> throw e;
+                }
+            }
+        }
+        return new SubstituteOfferChunkResult(applied, alreadyApplied, staleRejected);
+    }
+
+    public record SubstituteOfferChunkResult(int applied, int alreadyApplied, int staleRejected) {
+
+    }
+
+    private void substituteOffer(
         Long demandId,
         Long demandBoardId,
         Long expectedOriginalCatalogId,
@@ -321,37 +387,25 @@ public class DemandBoardService {
     public AwardingResultResponseDto applyAwardingResult(AwardingResultRequestDto request) {
         int appliedCount = 0;
         int staleRejectedCount = 0;
-        for (BoardResult boardResult : nullSafe(request.results())) {
+        for (List<BoardResult> boardResultList : chunk(
+            request.results(),
+            Comparator.comparing(BoardResult::boardId)
+        )) {
             try {
-                self.award(boardResult);
-                appliedCount += 1;
-            } catch (BusinessException e) {
-                switch (e.getErrorCode()) {
-                    case DEMAND_BOARD_NOT_FOUND,
-                         DEMAND_BOARD_AWARDING_INCONSISTENT,
-                         DEMAND_BOARD_NO_PARTICIPANT -> {
-                        staleRejectedCount += 1;
-                        log.warn("Awarding stale: boardId={}, code={}, message={}",
-                            boardResult.boardId(), e.getErrorCode(), e.getMessage());
-                    }
-                    default -> {
-                        log.error(
-                            "Awarding failed with unexpected BusinessException: boardId={}, code={}",
-                            boardResult.boardId(), e.getErrorCode(), e);
-                    }
-                }
+                AwardingChunkResult result = self.awardChunk(boardResultList);
+                appliedCount += result.applied();
+                staleRejectedCount += result.staleRejected();
             } catch (DataAccessException e) {
-                staleRejectedCount += 1;
-                log.error("Awarding failed with data exception: boardId={}",
-                    boardResult.boardId(), e);
+                staleRejectedCount += boardResultList.size();
+                log.error("Awarding chunk failed with data exception: boardResults={}",
+                    boardResultList, e);
             } catch (RuntimeException e) {
                 // 심각한 오류입니다. 이후 알림이 추가될 시 이 부분에 log 알림을 붙여야 합니다
                 // metrix가 있다면 해당 부분에 붙이는것도 좋아 보입니다.
-                staleRejectedCount += 1;
+                staleRejectedCount += boardResultList.size();
                 log.error(
-                    "Awarding failed with unexpected runtime exception: boardId={}",
-                    boardResult.boardId(),
-                    e);
+                    "Awarding chunk failed with unexpected runtime exception: boardResults={}",
+                    boardResultList, e);
             }
         }
         log.info("Awarding applied: total={}, applied={}, stale={}",
@@ -364,7 +418,35 @@ public class DemandBoardService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void award(BoardResult boardResult) {
+    public AwardingChunkResult awardChunk(List<BoardResult> boardResults) {
+        int applied = 0;
+        int staleRejected = 0;
+        for (BoardResult br : boardResults) {
+            try {
+                award(br);
+                applied++;
+            } catch (BusinessException e) {
+                switch (e.getErrorCode()) {
+                    case DEMAND_BOARD_NOT_FOUND,
+                         DEMAND_BOARD_AWARDING_INCONSISTENT,
+                         DEMAND_BOARD_NO_PARTICIPANT -> {
+                        // 상태 변경 이전에 던져지는 예외이므로 다른 boardResult에 영향 없음
+                        staleRejected++;
+                        log.warn("Awarding stale: boardId={}, code={}, message={}",
+                            br.boardId(), e.getErrorCode(), e.getMessage());
+                    }
+                    default -> throw e;
+                }
+            }
+        }
+        return new AwardingChunkResult(applied, staleRejected);
+    }
+
+    public record AwardingChunkResult(int applied, int staleRejected) {
+
+    }
+
+    private void award(BoardResult boardResult) {
         LocalDateTime now = LocalDateTime.now();
 
         Optional<Long> winnerId = Optional.empty();
@@ -444,5 +526,24 @@ public class DemandBoardService {
 
     private static <T> List<T> nullSafe(List<T> list) {
         return list == null ? List.of() : list;
+    }
+
+    private static <T> List<List<T>> chunk(List<T> list) {
+        return chunk(list, null);
+    }
+
+    private static <T> List<List<T>> chunk(
+        List<T> list, Comparator<T> comparator) {
+        List<T> safe = nullSafe(list);
+        if (comparator != null) {
+            safe = safe.stream().sorted(comparator).toList();
+        }
+        final List<T> ordered = safe;
+        return IntStream.range(0,
+                (ordered.size() + FORMATION_PLAN_CHUNK_SIZE - 1) / FORMATION_PLAN_CHUNK_SIZE)
+            .mapToObj(i -> ordered.subList(
+                i * FORMATION_PLAN_CHUNK_SIZE,
+                Math.min((i + 1) * FORMATION_PLAN_CHUNK_SIZE, ordered.size())))
+            .toList();
     }
 }
