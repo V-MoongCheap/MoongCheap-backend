@@ -27,13 +27,14 @@ public class SecurityConfig {
     private final OAuth2LoginFailureHandler oauth2LoginFailureHandler;
     private final SessionAuthenticationFilter sessionAuthenticationFilter;
     private final IncompleteSignupFilter incompleteSignupFilter;
+    private final InternalApiKeyFilter internalApiKeyFilter;
     private final CorsConfigurationSource corsConfigurationSource;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
-            .addFilterBefore(sessionAuthenticationFilter,
-                UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(internalApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(sessionAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(incompleteSignupFilter, SessionAuthenticationFilter.class)
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -58,7 +59,9 @@ public class SecurityConfig {
                     "/v3/api-docs.yaml",
                     "/swagger-resources/**",
                     "/api/products-search/internal/**",
-                    "/api/products-search/internal"
+                    "/api/products-search/internal",
+                    "/api/demand-boards/internal/**",
+                    "/api/awarding/**"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

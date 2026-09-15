@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -46,7 +47,22 @@ public class DemandBoard extends BaseTimeEntity {
     @Column(name = "sale_end_at", nullable = false)
     private LocalDateTime saleEndAt;
 
+    @Builder
+    private DemandBoard(Long catalogId, Integer priceMin, Integer priceMax,
+        LocalDateTime saleEndAt, int participantCount, DemandBoardStatus status) {
+        this.catalogId = catalogId;
+        this.priceMin = priceMin;
+        this.priceMax = priceMax;
+        this.saleEndAt = saleEndAt;
+        this.participantCount = participantCount;
+        this.status = status;
+    }
+
     public void increaseParticipantCount() {
         this.participantCount += 1;
+    }
+
+    public void increaseParticipantCount(int count) {
+        this.participantCount += count;
     }
 }

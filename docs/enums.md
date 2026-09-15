@@ -1,26 +1,7 @@
 # Enum 값 정리
 
-> Status 값은 [status.md](status.md)를 참조하세요.
-
-## SellerStatus
-> `com.moongcheap_backend.member.domain.SellerStatus`
-> 판매자 계정의 심사·운영 상태를 나타냅니다.
-
-| 값 | 설명 |
-|---|---|
-| `PENDING` | 판매자 등록 신청 후 관리자 심사 대기 중 |
-| `APPROVED` | 심사 완료, 정상 영업 가능 상태 |
-| `BLOCKED` | 관리자에 의해 판매 차단된 상태 |
-| `WITHDRAWN` | 판매자 스스로 탈퇴한 상태 |
-
-**상태 전이**
-```
-PENDING → APPROVED   (관리자 승인)
-APPROVED → BLOCKED   (관리자 차단)
-APPROVED → WITHDRAWN (판매자 탈퇴 → softDelete())
-```
-
----
+> Status 값(생애주기 계열)은 [status.md](status.md)를 참조하세요.
+> 이 문서는 상태 전이가 없는 비-Status 계열 enum(역할, 제공자, 알림 종류, 에러 코드 등)을 다룹니다.
 
 ## MemberRole
 > **Java enum** `com.moongcheap_backend.common.security.MemberRole`
@@ -105,8 +86,10 @@ APPROVED → WITHDRAWN (판매자 탈퇴 → softDelete())
 | `OAUTH_STATE_INVALID` | 400 | AUTH_010 | OAuth 상태값 검증에 실패했습니다. |
 | `SOCIAL_ALREADY_LINKED` | 409 | AUTH_011 | 이미 다른 회원에 연동된 소셜 계정입니다. |
 | `LAST_CREDENTIAL_CANNOT_UNLINK` | 400 | AUTH_012 | 마지막 로그인 수단은 해제할 수 없습니다. |
+| `SOCIAL_SIGNUP_ALREADY_COMPLETE` | 400 | AUTH_013 | 이미 소셜 가입이 완료되었습니다. |
 | `WITHDRAW_BLOCKED_HAS_ORDER` | 400 | AUTH_014 | 진행 중인 거래가 있어 탈퇴할 수 없습니다. |
 | `CONCURRENT_SIGNUP_CONFLICT` | 409 | AUTH_015 | 회원가입에 실패했습니다. 잠시 후 다시 시도해주세요. |
+| `SOCIAL_SIGNUP_INCOMPLETE` | 403 | AUTH_016 | 소셜 가입 완료가 필요합니다. |
 
 ### Member
 
@@ -133,7 +116,52 @@ APPROVED → WITHDRAWN (판매자 탈퇴 → softDelete())
 | `BUSINESS_NUMBER_INVALID` | 400 | SELLER_002 | 사업자등록번호 형식이 올바르지 않습니다. |
 | `BUSINESS_NUMBER_DUPLICATED` | 409 | SELLER_003 | 이미 등록된 사업자등록번호입니다. |
 | `SELLER_NOT_FOUND` | 404 | SELLER_004 | 판매자 정보를 찾을 수 없습니다. |
-| `SELLER_INTEREST_CATEGORY_REQUIRED` | 400 | SELLER_005 | 관심 카테고리는 최소 1개 이상 지정해야 합니다. |
-| `SELLER_INTEREST_CATEGORY_LIMIT` | 400 | SELLER_006 | 관심 카테고리는 최대 10개까지 지정할 수 있습니다. |
 | `SELLER_MUTABLE_FIELD_ONLY` | 400 | SELLER_007 | 해당 필드는 수정할 수 없습니다. |
 | `SELLER_NOT_APPROVED` | 403 | SELLER_008 | 승인된 판매자만 사용할 수 있습니다. |
+
+### Product
+
+| 값 | HTTP 상태 | 코드 | 메시지 |
+|---|---|---|---|
+| `PRODUCT_CATALOG_NOT_FOUND` | 404 | PRODUCT_001 | 상품 카탈로그를 찾을 수 없습니다. |
+| `PRODUCT_NOT_ORDERABLE` | 409 | PRODUCT_002 | 현재 주문할 수 없는 상품입니다. |
+
+### Demand
+
+| 값 | HTTP 상태 | 코드 | 메시지 |
+|---|---|---|---|
+| `DEMAND_ALREADY_EXISTS` | 409 | DEMAND_001 | 이미 진행 중인 수요 요청이 있습니다. |
+| `DEMAND_NOT_FOUND` | 404 | DEMAND_002 | 수요 요청을 찾을 수 없습니다. |
+| `DEMAND_FORBIDDEN` | 403 | DEMAND_003 | 본인의 수요 요청이 아닙니다. |
+| `DEMAND_BOARD_NOT_FOUND` | 404 | DEMAND_004 | 수요 보드를 찾을 수 없습니다. |
+| `DEMAND_CANCEL_NOT_ALLOWED` | 400 | DEMAND_005 | 현재 상태에서는 수요를 취소할 수 없습니다. |
+| `DEMAND_BOARD_CLOSED` | 400 | DEMAND_006 | 마감된 수요 보드입니다. |
+| `DEMAND_ACCEPT_NOT_ALLOWED` | 400 | DEMAND_007 | 현재 상태에서는 대체 오퍼를 승낙할 수 없습니다. |
+| `DEMAND_ACCEPT_CATALOG_CONFLICT` | 409 | DEMAND_008 | 제안된 상품과 동일한 상품의 진행 중인 수요가 이미 존재하여 승낙할 수 없습니다. |
+| `DEMAND_DESIRE_EXPIRED` | 400 | DEMAND_009 | 수요 희망 기간이 만료되었습니다. |
+| `DEMAND_ASSIGNMENT_MISMATCH` | 400 | DEMAND_010 | 일부 수요가 이미 배정되었거나 유효하지 않은 상태입니다. |
+| `DEMAND_SUBSTITUTE_NOT_ELIGIBLE` | 409 | DEMAND_011 | 대체 오퍼를 받을 수 없는 수요입니다. |
+| `DEMAND_SUBSTITUTE_ALREADY_APPLIED` | 409 | DEMAND_012 | 이미 저장된 대체 제안입니다. |
+| `DEMAND_BOARD_AWARDING_INCONSISTENT` | 409 | DEMAND_013 | 낙찰 결과와 상품 상태가 일치하지 않습니다. |
+| `DEMAND_BOARD_NO_PARTICIPANT` | 409 | DEMAND_014 | 낙찰 대상 참여 수요가 존재하지 않습니다. |
+
+### Order
+
+| 값 | HTTP 상태 | 코드 | 메시지 |
+|---|---|---|---|
+| `ORDER_NOT_FOUND` | 404 | ORDER_001 | 주문을 찾을 수 없습니다. |
+| `ORDER_CANNOT_CANCEL` | 409 | ORDER_002 | 현재 상태에서는 주문을 취소할 수 없습니다. |
+| `ORDER_CANNOT_SHIPPING` | 409 | ORDER_003 | 현재 상태에서는 배송지를 입력할 수 없습니다. |
+
+### GroupBuy
+
+| 값 | HTTP 상태 | 코드 | 메시지 |
+|---|---|---|---|
+| `GROUPBUY_NOT_FOUND` | 404 | GROUPBUY_001 | 공동구매를 찾을 수 없습니다. |
+| `GROUPBUY_NOT_OPEN` | 409 | GROUPBUY_002 | 현재 주문할 수 없는 공동구매입니다. |
+
+### Search
+
+| 값 | HTTP 상태 | 코드 | 메시지 |
+|---|---|---|---|
+| `SEARCH_INDEX_FAILED` | 500 | SEARCH_001 | 상품 검색 인덱싱에 실패했습니다. |

@@ -3,9 +3,12 @@ package com.moongcheap_backend.demand.infrastructure.demandBoard;
 import com.moongcheap_backend.demand.domain.demand.DemandStatus;
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoardStatus;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.AuctionResultDto;
+import com.moongcheap_backend.demand.presentation.demandBoard.dto.AwardingPendingResponseDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.CatalogDemandBoardListDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.DemandBoardSummaryDto;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -218,5 +221,106 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
             Map.of("demandBoardId", demandBoardId, "memberId", memberId),
             AUCTION_RESULT_MAPPER
         ).stream().findFirst();
+    }
+
+    private static final String PENDING_AWARDING_BOARDS_QUERY = """
+        SELECT
+            db.id             AS board_id,
+            db.catalog_id     AS catalog_id,
+            db.price_min      AS price_min,
+            db.price_max      AS price_max,
+            db.sale_end_at    AS sale_end_at,
+            db.updated_at     AS calculation_started_at,
+            db.participant_count AS participant_count,
+            COALESCE((
+                SELECT SUM(d.quantity)
+                FROM demand d
+                WHERE d.demand_board_id = db.id
+                  AND d.status = 'ASSIGNED'
+            ), 0)             AS total_quantity
+        FROM demand_board db
+        WHERE db.status = 'GB_AWARDING'
+        ORDER BY db.updated_at ASC, db.id ASC
+        LIMIT :limit
+        """;
+
+    private static final String PENDING_AWARDING_PRODUCTS_QUERY = """
+        SELECT
+            p.id              AS product_id,
+            p.demand_board_id AS board_id,
+            p.seller_id       AS seller_id,
+            p.unit_price      AS price,
+            p.total_quantity  AS quantity
+        FROM product p
+        WHERE p.demand_board_id IN (:boardIds)
+          AND p.status = 'AWARDING'
+        ORDER BY p.id ASC
+        """;
+
+    @Override
+    public List<AwardingPendingResponseDto.Board> getPendingAwardingBoards(int fetchSize) {
+        List<PendingBoardRow> boardRows = jdbcTemplate.query(
+            PENDING_AWARDING_BOARDS_QUERY,
+            Map.of("limit", fetchSize),
+            (rs, rowNum) -> new PendingBoardRow(
+                rs.getLong("board_id"),
+                rs.getLong("catalog_id"),
+                rs.getObject("price_min", Integer.class),
+                rs.getObject("price_max", Integer.class),
+                rs.getObject("sale_end_at", LocalDateTime.class),
+                rs.getObject("calculation_started_at", LocalDateTime.class),
+                rs.getInt("participant_count"),
+                rs.getLong("total_quantity")
+            )
+        );
+
+        if (boardRows.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> boardIds = boardRows.stream().map(PendingBoardRow::boardId).toList();
+        Map<Long, List<AwardingPendingResponseDto.Product>> productsByBoard = new HashMap<>();
+        jdbcTemplate.query(
+            PENDING_AWARDING_PRODUCTS_QUERY,
+            new MapSqlParameterSource("boardIds", boardIds),
+            (rs, rowNum) -> {
+                Long boardId = rs.getLong("board_id");
+                AwardingPendingResponseDto.Product product = new AwardingPendingResponseDto.Product(
+                    rs.getLong("product_id"),
+                    rs.getLong("seller_id"),
+                    rs.getObject("price", Integer.class),
+                    rs.getObject("quantity", Integer.class)
+                );
+                productsByBoard.computeIfAbsent(boardId, k -> new ArrayList<>()).add(product);
+                return null;
+            }
+        );
+
+        return boardRows.stream()
+            .map(row -> new AwardingPendingResponseDto.Board(
+                row.boardId(),
+                row.catalogId(),
+                row.priceMin(),
+                row.priceMax(),
+                row.saleEndAt(),
+                row.calculationStartedAt(),
+                row.participantCount(),
+                row.totalQuantity(),
+                productsByBoard.getOrDefault(row.boardId(), List.of())
+            ))
+            .toList();
+    }
+
+    private record PendingBoardRow(
+        Long boardId,
+        Long catalogId,
+        Integer priceMin,
+        Integer priceMax,
+        LocalDateTime saleEndAt,
+        LocalDateTime calculationStartedAt,
+        int participantCount,
+        Long totalQuantity
+    ) {
+
     }
 }

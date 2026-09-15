@@ -2,13 +2,15 @@ package com.moongcheap_backend.demand.application.demand;
 
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
+import com.moongcheap_backend.common.util.TimeUtils;
 import com.moongcheap_backend.demand.domain.demand.Demand;
 import com.moongcheap_backend.demand.domain.demand.DemandStatus;
-import com.moongcheap_backend.demand.domain.demandBoard.DemandBoard;
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoardStatus;
+import com.moongcheap_backend.demand.domain.rejectHistory.RejectHistory;
 import com.moongcheap_backend.demand.infrastructure.demand.DemandQueryRepository;
 import com.moongcheap_backend.demand.infrastructure.demand.DemandRepository;
 import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardRepository;
+import com.moongcheap_backend.demand.infrastructure.rejectHistory.RejectHistoryRepository;
 import com.moongcheap_backend.demand.presentation.demand.dto.DemandCreateRequestDto;
 import com.moongcheap_backend.demand.presentation.demand.dto.DemandListDto;
 import com.moongcheap_backend.product.domain.productCatalog.ProductCatalogStatus;
@@ -17,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -30,6 +33,7 @@ public class DemandService {
     private final DemandQueryRepository demandQueryRepository;
     private final ProductCatalogRespository productCatalogRespository;
     private final DemandBoardRepository demandBoardRepository;
+    private final RejectHistoryRepository rejectHistoryRepository;
 
     @Transactional
     public Long create(DemandCreateRequestDto request, Long memberId) {
@@ -47,13 +51,17 @@ public class DemandService {
             .payMethodId(request.payMethodId())
             .desiredPriceMin(request.desiredPriceMin())
             .desiredPriceMax(request.desiredPriceMax())
-            .desireEndAt(LocalDateTime.now().plusDays(2))
+            .desireEndAt(TimeUtils.ceilToFiveMinuteMark(LocalDateTime.now().plusDays(2)))
             .quantity(request.quantity())
             .extraRequirement(request.extraRequirement())
             .isSubstitutable(request.isSubstitutable())
             .build();
+        try {
+            return demandRepository.save(demand).getId();
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.DEMAND_ALREADY_EXISTS);
+        }
 
-        return demandRepository.save(demand).getId();
     }
 
     private static final List<DemandStatus> ACTIVE_STATUSES = List.of(
@@ -121,10 +129,8 @@ public class DemandService {
         if (demand.getDemandBoardId() == null) {
             throw new BusinessException(ErrorCode.DEMAND_ACCEPT_NOT_ALLOWED);
         }
-        DemandBoard demandBoard = demandBoardRepository.findById(demand.getDemandBoardId())
-            .orElseThrow(() -> new BusinessException(ErrorCode.DEMAND_BOARD_NOT_FOUND));
         int updated = demandBoardRepository.increaseParticipantCountIfActive(
-            demandBoard.getId(), DemandBoardStatus.GB_GATHERING);
+            demand.getDemandBoardId(), DemandBoardStatus.GB_GATHERING);
         if (updated == 0) {
             demand.rejectOffer();
         } else {
@@ -145,6 +151,7 @@ public class DemandService {
         if (demand.getDemandBoardId() == null) {
             throw new BusinessException(ErrorCode.DEMAND_ACCEPT_NOT_ALLOWED);
         }
+        rejectHistoryRepository.save(RejectHistory.of(demand.getId(), demand.getDemandBoardId()));
         demand.rejectOffer();
     }
 

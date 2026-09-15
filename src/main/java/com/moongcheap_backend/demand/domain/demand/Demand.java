@@ -111,4 +111,9 @@ public class Demand extends BaseTimeEntity {
         this.demandBoardId = null;
         this.status = DemandStatus.UNASSIGNED;
     }
+
+    public void substituteOffer(Long demandBoardId) {
+        this.demandBoardId = demandBoardId;
+        this.status = DemandStatus.SUBSTITUTE_OFFERED;
+    }
 }

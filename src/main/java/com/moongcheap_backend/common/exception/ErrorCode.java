@@ -62,6 +62,11 @@ public enum ErrorCode {
     DEMAND_ACCEPT_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DEMAND_007", "현재 상태에서는 대체 오퍼를 승낙할 수 없습니다."),
     DEMAND_ACCEPT_CATALOG_CONFLICT(HttpStatus.CONFLICT, "DEMAND_008", "제안된 상품과 동일한 상품의 진행 중인 수요가 이미 존재하여 승낙할 수 없습니다."),
     DEMAND_DESIRE_EXPIRED(HttpStatus.BAD_REQUEST, "DEMAND_009", "수요 희망 기간이 만료되었습니다."),
+    DEMAND_ASSIGNMENT_MISMATCH(HttpStatus.BAD_REQUEST, "DEMAND_010", "일부 수요가 이미 배정되었거나 유효하지 않은 상태입니다."),
+    DEMAND_SUBSTITUTE_NOT_ELIGIBLE(HttpStatus.CONFLICT, "DEMAND_011", "대체 오퍼를 받을 수 없는 수요입니다."),
+    DEMAND_SUBSTITUTE_ALREADY_APPLIED(HttpStatus.CONFLICT, "DEMAND_012", "이미 저장된 대체 제안입니다."),
+    DEMAND_BOARD_AWARDING_INCONSISTENT(HttpStatus.CONFLICT, "DEMAND_013", "낙찰 결과와 상품 상태가 일치하지 않습니다."),
+    DEMAND_BOARD_NO_PARTICIPANT(HttpStatus.CONFLICT, "DEMAND_014", "낙찰 대상 참여 수요가 존재하지 않습니다."),
 
     // Order
     ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "ORDER_001", "주문을 찾을 수 없습니다."),
