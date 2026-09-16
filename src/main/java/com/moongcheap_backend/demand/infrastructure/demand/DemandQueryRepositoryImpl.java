@@ -21,13 +21,23 @@ public class DemandQueryRepositoryImpl implements DemandQueryRepository {
 
     private static final RowMapper<DemandListDto.DemandItemDto> MAPPER = (rs, rowNum) -> {
         Long boardId = rs.getObject("board_id", Long.class);
+        Long boardCatalogId = rs.getObject("board_catalog_id", Long.class);
+        DemandListDto.CatalogDto boardCatalog = boardCatalogId == null ? null
+            : new DemandListDto.CatalogDto(
+                boardCatalogId,
+                rs.getString("board_catalog_name"),
+                rs.getString("board_catalog_spec_summary"),
+                rs.getString("board_catalog_thumbnail_url"),
+                rs.getObject("board_catalog_list_price", Integer.class)
+            );
         DemandListDto.DemandBoardDto board =
             boardId == null ? null : new DemandListDto.DemandBoardDto(
                 boardId,
                 rs.getInt("participant_count"),
                 rs.getObject("board_price_min", Integer.class),
                 rs.getObject("board_price_max", Integer.class),
-                rs.getObject("board_sale_end_at", LocalDateTime.class)
+                rs.getObject("board_sale_end_at", LocalDateTime.class),
+                boardCatalog
             );
         return new DemandListDto.DemandItemDto(
             rs.getLong("id"),
@@ -38,9 +48,11 @@ public class DemandQueryRepositoryImpl implements DemandQueryRepository {
             rs.getObject("quantity", Integer.class),
             rs.getString("extra_requirement"),
             rs.getBoolean("is_substitutable"),
+            rs.getObject("created_at", LocalDateTime.class),
             new DemandListDto.CatalogDto(
                 rs.getLong("catalog_id"),
                 rs.getString("catalog_name"),
+                rs.getString("catalog_spec_summary"),
                 rs.getString("catalog_thumbnail_url"),
                 rs.getObject("catalog_list_price", Integer.class)
             ),
@@ -58,18 +70,26 @@ public class DemandQueryRepositoryImpl implements DemandQueryRepository {
             d.quantity,
             d.extra_requirement,
             d.is_substitutable,
+            d.created_at,
             pc.id            AS catalog_id,
             pc.name          AS catalog_name,
+            pc.spec_summary  AS catalog_spec_summary,
             pc.thumbnail_url AS catalog_thumbnail_url,
             pc.list_price    AS catalog_list_price,
             db.id            AS board_id,
             db.participant_count,
             db.price_min     AS board_price_min,
             db.price_max     AS board_price_max,
-            db.sale_end_at   AS board_sale_end_at
+            db.sale_end_at   AS board_sale_end_at,
+            pc2.id            AS board_catalog_id,
+            pc2.name          AS board_catalog_name,
+            pc2.spec_summary  AS board_catalog_spec_summary,
+            pc2.thumbnail_url AS board_catalog_thumbnail_url,
+            pc2.list_price    AS board_catalog_list_price
         FROM demand d
-        INNER JOIN product_catalog pc ON d.catalog_id = pc.id
-        LEFT  JOIN demand_board   db ON d.demand_board_id = db.id
+        INNER JOIN product_catalog pc  ON d.catalog_id      = pc.id
+        LEFT  JOIN demand_board   db   ON d.demand_board_id = db.id
+        LEFT  JOIN product_catalog pc2 ON db.catalog_id     = pc2.id AND d.status = 'SUBSTITUTE_OFFERED'
         WHERE d.id = :demandId
           AND d.member_id = :memberId
         """;
@@ -84,15 +104,22 @@ public class DemandQueryRepositoryImpl implements DemandQueryRepository {
             d.quantity,
             d.extra_requirement,
             d.is_substitutable,
+            d.created_at,
             pc.id            AS catalog_id,
             pc.name          AS catalog_name,
+            pc.spec_summary  AS catalog_spec_summary,
             pc.thumbnail_url AS catalog_thumbnail_url,
-            pc.list_price AS catalog_list_price,
+            pc.list_price    AS catalog_list_price,
             db.id            AS board_id,
             db.participant_count,
             db.price_min     AS board_price_min,
             db.price_max     AS board_price_max,
-            db.sale_end_at   AS board_sale_end_at
+            db.sale_end_at   AS board_sale_end_at,
+            pc2.id            AS board_catalog_id,
+            pc2.name          AS board_catalog_name,
+            pc2.spec_summary  AS board_catalog_spec_summary,
+            pc2.thumbnail_url AS board_catalog_thumbnail_url,
+            pc2.list_price    AS board_catalog_list_price
         FROM (
             SELECT *
             FROM demand
@@ -101,8 +128,9 @@ public class DemandQueryRepositoryImpl implements DemandQueryRepository {
             ORDER BY desire_end_at ASC, id ASC
             LIMIT :limit OFFSET :offset
         ) d
-        INNER JOIN product_catalog pc ON d.catalog_id = pc.id
-        LEFT  JOIN demand_board   db ON d.demand_board_id = db.id
+        INNER JOIN product_catalog pc  ON d.catalog_id      = pc.id
+        LEFT  JOIN demand_board   db   ON d.demand_board_id = db.id
+        LEFT  JOIN product_catalog pc2 ON db.catalog_id     = pc2.id AND d.status = 'SUBSTITUTE_OFFERED'
         """;
 
     @Override

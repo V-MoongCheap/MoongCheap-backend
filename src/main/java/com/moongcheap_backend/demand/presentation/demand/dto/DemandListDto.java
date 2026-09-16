@@ -27,6 +27,7 @@ public record DemandListDto(
         Integer quantity,
         String extraRequirement,
         boolean isSubstitutable,
+        LocalDateTime createdAt,
         CatalogDto catalog,
         DemandBoardDto demandBoard
     ) {
@@ -36,6 +37,7 @@ public record DemandListDto(
     public record CatalogDto(
         Long id,
         String name,
+        String specSummary,
         String thumbnailUrl,
         Integer listPrice
     ) {
@@ -47,7 +49,8 @@ public record DemandListDto(
         int participantCount,
         Integer priceMin,
         Integer priceMax,
-        LocalDateTime saleEndAt
+        LocalDateTime saleEndAt,
+        CatalogDto catalog
     ) {
 
     }

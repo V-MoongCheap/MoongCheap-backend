@@ -93,11 +93,12 @@ public class DemandService {
     }
 
     @Transactional(readOnly = true)
-    public DemandListDto list(Long memberId, Pageable pageable) {
+    public DemandListDto list(Long memberId, List<DemandStatus> statuses, Pageable pageable) {
         Pageable fetchPageable = PageRequest.of(
             pageable.getPageNumber(), pageable.getPageSize() + 1, pageable.getSort());
         List<DemandListDto.DemandItemDto> items =
-            demandQueryRepository.findDemandItemsByMemberId(memberId, ACTIVE_STATUSES,
+            demandQueryRepository.findDemandItemsByMemberId(memberId,
+                statuses != null ? statuses : ACTIVE_STATUSES,
                 fetchPageable);
         return DemandListDto.of(items, pageable);
     }

@@ -20,7 +20,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.moongcheap_backend.demand.domain.demand.DemandStatus;
+import java.util.List;
 
 @Tag(name = "Demand · 수요 관리", description = "수요 CRUD")
 @RestController
@@ -41,8 +44,9 @@ public class DemandController {
     @Operation(summary = "나의 수요 확인(! 내용중 사용하지 않는 내용이 있다면 알려주세요)", description = "FN-B17-01. 내 수요 참여 목록 조회")
     @GetMapping
     public ResponseEntity<DemandListDto> read(SessionPrincipal principal,
+        @RequestParam(required = false) List<DemandStatus> statuses,
         @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(demandService.list(principal.memberId(), pageable));
+        return ResponseEntity.ok(demandService.list(principal.memberId(), statuses, pageable));
     }
 
     @Operation(summary = "수요 단건 조회", description = "FN-B16-01,FN-B17-01. 수요 ID로 본인 수요를 단건 조회합니다. (모든 상태의 수요 검색)")
