@@ -8,7 +8,7 @@
  *       INSERT 를 batch 로 묶어 전송할 수 있게 됨.
  * ==========================================================================*/
 
-CREATE SEQUENCE product_award_evaluation_id_seq;
+CREATE SEQUENCE product_award_evaluation_id_seq INCREMENT BY 20;
 
 ALTER TABLE product_award_evaluation
     ALTER COLUMN id DROP IDENTITY IF EXISTS,
@@ -16,7 +16,7 @@ ALTER TABLE product_award_evaluation
 
 SELECT setval(
     'product_award_evaluation_id_seq',
-    COALESCE((SELECT MAX(id) FROM product_award_evaluation), 0)
+    COALESCE((SELECT MAX(id) FROM product_award_evaluation), 1)
 );
 
 ALTER SEQUENCE product_award_evaluation_id_seq OWNED BY product_award_evaluation.id;
