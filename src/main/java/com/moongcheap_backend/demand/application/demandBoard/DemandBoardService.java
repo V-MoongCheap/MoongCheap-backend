@@ -35,6 +35,8 @@ import com.moongcheap_backend.demand.presentation.demandBoard.dto.SubstituteOffe
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.SubstituteOfferPlanRequestDto.Proposal;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.SubstituteOfferPlanResponseDto;
 import com.moongcheap_backend.groupbuy.application.GroupBuyService;
+import com.moongcheap_backend.payments.domain.enums.PaymentsMethodStatus;
+import com.moongcheap_backend.payments.infrastructure.BrandPayMethodRepository;
 import com.moongcheap_backend.product.domain.product.ProductStatus;
 import com.moongcheap_backend.product.domain.productAwardEvaluation.ProductAwardEvaluation;
 import com.moongcheap_backend.product.infrastructure.product.ProductRepository;
@@ -73,6 +75,7 @@ public class DemandBoardService {
     private final ProductAwardEvaluationRepository productAwardEvaluationRepository;
     private final ProductRepository productRepository;
     private final GroupBuyService groupBuyService;
+    private final BrandPayMethodRepository brandPayMethodRepository;
 
     @Lazy
     @Autowired
@@ -135,6 +138,11 @@ public class DemandBoardService {
 
     @Transactional
     public Long join(Long memberId, Long demandBoardId, DemandBoardJoinRequestDto request) {
+        if (!brandPayMethodRepository.existsByIdAndMemberIdAndStatus(
+            request.payMethodId(), memberId, PaymentsMethodStatus.ACTIVE
+        )) {
+            throw new BusinessException(ErrorCode.BRAND_PAY_METHOD_NOT_FOUND);
+        }
         DemandBoard demandBoard = demandBoardRepository.findByIdAndStatusInForUpdate(demandBoardId,
                 List.of(DemandBoardStatus.GB_GATHERING))
             .orElseThrow(() -> new BusinessException(ErrorCode.DEMAND_BOARD_NOT_FOUND));
@@ -142,7 +150,6 @@ public class DemandBoardService {
             || demandBoard.getSaleEndAt().isBefore(LocalDateTime.now())) {
             throw new BusinessException(ErrorCode.DEMAND_BOARD_CLOSED);
         }
-        //TODO: payMethodId 검증 로직
         Demand demand = Demand.boardJoinBuilder()
             .demandBoardId(demandBoard.getId())
             .memberId(memberId)
