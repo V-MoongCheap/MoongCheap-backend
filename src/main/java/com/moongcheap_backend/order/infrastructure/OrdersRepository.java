@@ -34,4 +34,6 @@ public interface OrdersRepository extends JpaRepository<Orders, Long> {
         @Param("orderNo") String orderNo,
         @Param("memberId") Long memberId
     );
+
+    boolean existsByMemberIdAndOrderStatusIn(Long memberId, Collection<OrderStatus> statuses);
 }
