@@ -44,6 +44,15 @@ docs/transaction-timeout.md
 docs/demand-expire-batch.md
 docs/product-search-decisions.md
 docs/product-search.md
+docs/ai-awarding-flow.md
+docs/failure-handling-audit.md
+docs/formation-plan-orphan-board-analysis.md
+docs/nested-to-requires-new-migration-decision.md
+docs/nested-transaction-substitute-offer-analysis.md
+docs/retry-and-logging.md
+docs/demand-board-service-chunk-refactoring.md
+docs/identity-to-sequence-decision.md
+docs/demand-board-refactoring-full-log.md
 
 ### Environment ###
 .env

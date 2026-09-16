@@ -51,6 +51,17 @@ springdoc:
   default-produces-media-type: application/json
 
 resilience4j:
+  retry:
+    retry-aspect-order: 0
+    instances:
+      chunkRetry:
+        max-attempts: 3
+        wait-duration: 1s
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - org.springframework.dao.TransientDataAccessException
+          - org.springframework.dao.DataAccessResourceFailureException
   circuitbreaker:
     instances:
       opensearch:
@@ -63,6 +74,8 @@ resilience4j:
 moongcheap:
   batch:
     demand-expire:
+      cron: "0 5 * * * *"
+    demand-board-cancel:
       cron: "0 5 * * * *"
   group-buy:
     # PENDING Outbox의 Redis 발행 주기와 만료 판정 대상 조회 주기
@@ -79,3 +92,5 @@ moongcheap:
       # 64자 hex 문자열(32바이트) 권장. 프로파일별 파일에서 오버라이드
       password: "${MOONGCHEAP_ENC_PASSWORD:}"
       salt: "${MOONGCHEAP_ENC_SALT:}"
+    # 내부 API 인증 키. 추후 AWS Parameter Store로 관리 예정
+    internal-api-key: "${MOONGCHEAP_INTERNAL_API_KEY:}"
