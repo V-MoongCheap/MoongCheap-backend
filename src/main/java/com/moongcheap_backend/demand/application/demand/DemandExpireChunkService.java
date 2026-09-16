@@ -18,7 +18,6 @@ public class DemandExpireChunkService {
     private final AdvisoryLockAdaptor advisoryLockAdaptor;
     private final DemandRepository demandRepository;
 
-    //todo: error logging
     @Retry(name = "chunkRetry")
     @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 10)
     public Optional<Integer> expireChunk(LocalDateTime threshold, int chunkSize) {

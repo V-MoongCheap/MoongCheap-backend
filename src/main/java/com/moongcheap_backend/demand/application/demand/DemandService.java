@@ -13,6 +13,8 @@ import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardRepos
 import com.moongcheap_backend.demand.infrastructure.rejectHistory.RejectHistoryRepository;
 import com.moongcheap_backend.demand.presentation.demand.dto.DemandCreateRequestDto;
 import com.moongcheap_backend.demand.presentation.demand.dto.DemandListDto;
+import com.moongcheap_backend.payments.domain.enums.PaymentsMethodStatus;
+import com.moongcheap_backend.payments.infrastructure.BrandPayMethodRepository;
 import com.moongcheap_backend.product.domain.productCatalog.ProductCatalogStatus;
 import com.moongcheap_backend.product.infrastructure.productCatalog.ProductCatalogRespository;
 import java.time.LocalDateTime;
@@ -34,15 +36,21 @@ public class DemandService {
     private final ProductCatalogRespository productCatalogRespository;
     private final DemandBoardRepository demandBoardRepository;
     private final RejectHistoryRepository rejectHistoryRepository;
+    private final BrandPayMethodRepository brandPayMethodRepository;
 
     @Transactional
     public Long create(DemandCreateRequestDto request, Long memberId) {
-        // todo: request.payMethodId 를 통해 status 상태 확인
         // catalog 삭제의 경우 매우 드물게 일어난다는 가정 하에 lock 제약을 걸지 않음
         boolean hasCatalog = productCatalogRespository
             .existsByIdAndStatus(request.catalogId(), ProductCatalogStatus.ACTIVE);
         if (!hasCatalog) {
             throw new BusinessException(ErrorCode.PRODUCT_CATALOG_NOT_FOUND);
+        }
+        if (!brandPayMethodRepository
+            .existsByIdAndMemberIdAndStatus(
+                request.payMethodId(), memberId, PaymentsMethodStatus.ACTIVE
+            )) {
+            throw new BusinessException(ErrorCode.BRAND_PAY_METHOD_NOT_FOUND);
         }
 
         Demand demand = Demand.builder()
