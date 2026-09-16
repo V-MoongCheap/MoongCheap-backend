@@ -427,9 +427,7 @@ public class DemandBoardService {
                 applied++;
             } catch (BusinessException e) {
                 switch (e.getErrorCode()) {
-                    case DEMAND_BOARD_NOT_FOUND,
-                         DEMAND_BOARD_AWARDING_INCONSISTENT,
-                         DEMAND_BOARD_NO_PARTICIPANT -> {
+                    case DEMAND_BOARD_NOT_FOUND -> {
                         // 상태 변경 이전에 던져지는 예외이므로 다른 boardResult에 영향 없음
                         staleRejected++;
                         log.warn("Awarding stale: boardId={}, code={}, message={}",
