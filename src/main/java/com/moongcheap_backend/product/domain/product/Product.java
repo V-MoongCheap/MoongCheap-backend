@@ -103,6 +103,10 @@ public class Product extends BaseTimeEntity {
         return status == ProductStatus.AWARDED;
     }
 
+    public boolean isOnSale() {
+        return status == ProductStatus.ON_SALE;
+    }
+
     public void startSale() {
         this.status = ProductStatus.ON_SALE;
     }

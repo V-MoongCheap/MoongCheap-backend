@@ -78,8 +78,9 @@ moongcheap:
     demand-board-cancel:
       cron: "0 5 * * * *"
   group-buy:
-    # PENDING Outbox의 Redis 발행 주기와 만료 판정 대상 조회 주기
+    # PENDING Outbox 발행, 주문 Stream 소비, 만료 판정 대상 조회 주기
     outbox-publish-delay-ms: 1000
+    order-consume-delay-ms: 1000
     judgment-poll-delay-ms: 10000
   security:
     session:

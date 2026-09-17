@@ -56,7 +56,7 @@ class GroupBuyCreationServiceUnitTest {
     private GroupBuyService groupBuyService;
 
     @Test
-    void 공동구매와_판정_예약_Outbox를_함께_저장한다() {
+    void 공동구매와_주문_생성_및_판정_예약_Outbox를_함께_저장한다() {
         Long productId = 1L;
         Long groupBuyId = 2L;
         Long sellerId = 3L;
@@ -80,13 +80,21 @@ class GroupBuyCreationServiceUnitTest {
         groupBuyService.createGroupBuy(productId);
 
         ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
-        verify(outboxEventRepository).save(captor.capture());
-        OutboxEvent event = captor.getValue();
-        assertThat(event.getEventType())
+        verify(outboxEventRepository, org.mockito.Mockito.times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).hasSize(2);
+
+        OutboxEvent orderCreationEvent = captor.getAllValues().get(0);
+        assertThat(orderCreationEvent.getEventType())
+            .isEqualTo(OutboxEventType.GROUP_BUY_ORDER_CREATION_REQUESTED);
+        assertThat(orderCreationEvent.getAggregateId()).isEqualTo(groupBuyId);
+        assertThat(orderCreationEvent.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
+
+        OutboxEvent judgmentEvent = captor.getAllValues().get(1);
+        assertThat(judgmentEvent.getEventType())
             .isEqualTo(OutboxEventType.GROUP_BUY_JUDGMENT_SCHEDULED);
-        assertThat(event.getAggregateId()).isEqualTo(groupBuyId);
-        assertThat(event.getScheduledAt()).isEqualTo(saleEndAt.plusMinutes(5));
-        assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
+        assertThat(judgmentEvent.getAggregateId()).isEqualTo(groupBuyId);
+        assertThat(judgmentEvent.getScheduledAt()).isEqualTo(saleEndAt.plusMinutes(5));
+        assertThat(judgmentEvent.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
         verify(product).startSale();
     }
 }

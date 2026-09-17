@@ -10,6 +10,7 @@ import com.moongcheap_backend.common.outbox.domain.OutboxEvent;
 import com.moongcheap_backend.common.outbox.domain.OutboxEventStatus;
 import com.moongcheap_backend.common.outbox.infrastructure.OutboxEventRepository;
 import com.moongcheap_backend.groupbuy.infrastructure.GroupBuyJudgmentSchedule;
+import com.moongcheap_backend.groupbuy.infrastructure.GroupBuyOrderCreationStream;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -20,10 +21,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * 테스트 대상: {@link GroupBuyJudgmentOutboxPublishService}의 Redis 발행 및 재시도 기능
+ * 테스트 대상: {@link GroupBuyOutboxPublishService}의 Redis 발행 및 재시도 기능
  */
 @ExtendWith(MockitoExtension.class)
-class GroupBuyJudgmentOutboxPublishServiceUnitTest {
+class GroupBuyOutboxPublishServiceUnitTest {
 
     @Mock
     private OutboxEventRepository outboxEventRepository;
@@ -31,8 +32,11 @@ class GroupBuyJudgmentOutboxPublishServiceUnitTest {
     @Mock
     private GroupBuyJudgmentSchedule judgmentSchedule;
 
+    @Mock
+    private GroupBuyOrderCreationStream orderCreationStream;
+
     @InjectMocks
-    private GroupBuyJudgmentOutboxPublishService publishService;
+    private GroupBuyOutboxPublishService publishService;
 
     @Test
     @DisplayName("해피 케이스 - Redis 등록 후 Outbox 발행 완료")
@@ -49,6 +53,22 @@ class GroupBuyJudgmentOutboxPublishServiceUnitTest {
         assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PUBLISHED);
         assertThat(event.getPublishedAt()).isEqualTo(now);
         verify(judgmentSchedule).schedule(1L, scheduledAt);
+    }
+
+    @Test
+    @DisplayName("해피 케이스 - 주문 생성 요청을 Redis Stream에 발행")
+    void 주문_생성_요청을_Redis_Stream에_발행한다() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 10, 10, 0);
+        OutboxEvent event = OutboxEvent.groupBuyOrderCreationRequested(1L, now);
+        org.springframework.test.util.ReflectionTestUtils.setField(event, "id", 2L);
+        when(outboxEventRepository.findPublishableForUpdate(now, 100))
+            .thenReturn(List.of(event));
+
+        publishService.publishBatch(now, 100);
+
+        assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PUBLISHED);
+        verify(orderCreationStream).publish(2L, 1L);
+        verifyNoInteractions(judgmentSchedule);
     }
 
     @Test
@@ -79,6 +99,6 @@ class GroupBuyJudgmentOutboxPublishServiceUnitTest {
         int published = publishService.publishBatch(now, 100);
 
         assertThat(published).isZero();
-        verifyNoInteractions(judgmentSchedule);
+        verifyNoInteractions(judgmentSchedule, orderCreationStream);
     }
 }

@@ -13,17 +13,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * 테스트 대상: {@link GroupBuyJudgmentOutboxPublisher}의 Outbox 배치 실행 기능
+ * 테스트 대상: {@link GroupBuyOutboxPublisher}의 Outbox 배치 실행 기능
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("공동구매 판정 Outbox 스케줄러 - 해피 케이스")
-class GroupBuyJudgmentOutboxPublisherUnitTest {
+class GroupBuyOutboxPublisherUnitTest {
 
     @Mock
-    private GroupBuyJudgmentOutboxPublishService publishService;
+    private GroupBuyOutboxPublishService publishService;
 
     @InjectMocks
-    private GroupBuyJudgmentOutboxPublisher publisher;
+    private GroupBuyOutboxPublisher publisher;
 
     @Test
     void 발행_가능한_Outbox를_100개씩_조회해_발행한다() {

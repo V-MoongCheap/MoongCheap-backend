@@ -4,6 +4,7 @@ import com.moongcheap_backend.order.domain.Orders;
 import com.moongcheap_backend.order.domain.OrderStatus;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface OrdersRepository extends JpaRepository<Orders, Long> {
+
+    @Query("select o.demandId from Orders o where o.demandId in :demandIds")
+    List<Long> findExistingDemandIds(@Param("demandIds") Collection<Long> demandIds);
 
     Page<Orders> findAllByMemberId(Long memberId, Pageable pageable);
 

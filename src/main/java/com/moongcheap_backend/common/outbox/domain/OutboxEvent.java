@@ -88,6 +88,19 @@ public class OutboxEvent extends BaseTimeEntity {
         );
     }
 
+    // GroupBuy 생성과 같은 DB 트랜잭션에서 생성해 주문 생성 요청의 유실을 막는다.
+    public static OutboxEvent groupBuyOrderCreationRequested(
+        Long groupBuyId,
+        LocalDateTime now
+    ) {
+        return new OutboxEvent(
+            OutboxEventType.GROUP_BUY_ORDER_CREATION_REQUESTED,
+            groupBuyId,
+            now,
+            now
+        );
+    }
+
     public void markPublished(LocalDateTime now) {
         status = OutboxEventStatus.PUBLISHED;
         publishedAt = now;

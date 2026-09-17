@@ -246,6 +246,31 @@ class OrderServiceUnitTest {
             verify(preparedGroupBuy).increaseParticipantCount(39);
         }
 
+        @Test
+        void 이미_주문이_생성된_수요는_제외하고_새_주문만_참여_인원에_반영한다() {
+            Demand existingDemand = org.mockito.Mockito.mock(Demand.class);
+            when(existingDemand.getId()).thenReturn(1L);
+            when(existingDemand.getMemberId()).thenReturn(1L);
+            Demand newDemand = org.mockito.Mockito.mock(Demand.class);
+            when(newDemand.getId()).thenReturn(2L);
+            when(newDemand.getMemberId()).thenReturn(2L);
+            when(newDemand.getQuantity()).thenReturn(2);
+            when(newDemand.getDesiredPriceMax()).thenReturn(10_000);
+            List<Demand> demands = List.of(existingDemand, newDemand);
+            prepareOrderSource(demands);
+            when(ordersRepository.findExistingDemandIds(List.of(1L, 2L)))
+                .thenReturn(List.of(1L));
+
+            orderService.autoCreateOrder(10L);
+
+            verify(ordersRepository).saveAll(ordersCaptor.capture());
+            assertThat(ordersCaptor.getValue())
+                .singleElement()
+                .extracting(Orders::getDemandId)
+                .isEqualTo(2L);
+            verify(preparedGroupBuy).increaseParticipantCount(1);
+        }
+
         private List<Demand> createDemands(int count) {
             return IntStream.rangeClosed(1, count)
                 .mapToObj(index -> {
@@ -272,7 +297,7 @@ class OrderServiceUnitTest {
             when(seller.isSellable()).thenReturn(true);
             when(seller.getId()).thenReturn(20L);
             when(seller.getBusinessName()).thenReturn("문치프 농장");
-            when(product.isAwarded()).thenReturn(true);
+            when(product.isOnSale()).thenReturn(true);
             when(product.getSellerId()).thenReturn(20L);
             when(product.getThumbnailUrl()).thenReturn("https://example.com/image.jpg");
             when(product.getDemandBoardId()).thenReturn(30L);
@@ -303,7 +328,7 @@ class OrderServiceUnitTest {
             when(seller.isSellable()).thenReturn(true);
             when(seller.getId()).thenReturn(20L);
             when(seller.getBusinessName()).thenReturn("문치프 농장");
-            when(product.isAwarded()).thenReturn(true);
+            when(product.isOnSale()).thenReturn(true);
             when(product.getSellerId()).thenReturn(20L);
             when(product.getThumbnailUrl()).thenReturn("https://example.com/image.jpg");
             when(product.getDemandBoardId()).thenReturn(30L);
@@ -375,7 +400,7 @@ class OrderServiceUnitTest {
             when(groupBuy.getProduct()).thenReturn(product);
             when(seller.isSellable()).thenReturn(true);
             when(seller.getId()).thenReturn(20L);
-            when(product.isAwarded()).thenReturn(true);
+            when(product.isOnSale()).thenReturn(true);
             when(product.getSellerId()).thenReturn(20L);
             when(product.getThumbnailUrl()).thenReturn("https://example.com/image.jpg");
             when(product.getUnitPrice()).thenReturn(10_000);
@@ -429,7 +454,7 @@ class OrderServiceUnitTest {
             when(groupBuy.getProduct()).thenReturn(product);
             when(seller.isSellable()).thenReturn(true);
             when(seller.getId()).thenReturn(20L);
-            when(product.isAwarded()).thenReturn(true);
+            when(product.isOnSale()).thenReturn(true);
             when(product.getSellerId()).thenReturn(20L);
             when(product.getThumbnailUrl()).thenReturn("https://example.com/image.jpg");
             when(product.getUnitPrice()).thenReturn(10_000);
