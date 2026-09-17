@@ -27,7 +27,7 @@ public class ProductCatalog extends BaseTimeEntity {
     @Column(name = "list_price")
     private Integer listPrice;
 
-    @Column(name = "thumbnail_url", nullable = false, length = 255)
+    @Column(name = "thumbnail_url", length = 255)
     private String thumbnailUrl;
 
     @Column(name = "description", columnDefinition = "TEXT")
