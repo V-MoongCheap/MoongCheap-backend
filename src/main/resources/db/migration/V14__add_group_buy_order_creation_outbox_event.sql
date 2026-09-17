@@ -7,4 +7,4 @@ ALTER TABLE "outbox_event"
         CHECK ("event_type" IN (
             'GROUP_BUY_ORDER_CREATION_REQUESTED',
             'GROUP_BUY_JUDGMENT_SCHEDULED'
-        ));
+        )) NOT VALID;
