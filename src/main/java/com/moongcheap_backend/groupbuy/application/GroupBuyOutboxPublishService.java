@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class GroupBuyJudgmentOutboxPublishService {
+public class GroupBuyOutboxPublishService {
 
     private final OutboxEventRepository outboxEventRepository;
     private final GroupBuyJudgmentSchedule judgmentSchedule;

@@ -21,10 +21,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * 테스트 대상: {@link GroupBuyJudgmentOutboxPublishService}의 Redis 발행 및 재시도 기능
+ * 테스트 대상: {@link GroupBuyOutboxPublishService}의 Redis 발행 및 재시도 기능
  */
 @ExtendWith(MockitoExtension.class)
-class GroupBuyJudgmentOutboxPublishServiceUnitTest {
+class GroupBuyOutboxPublishServiceUnitTest {
 
     @Mock
     private OutboxEventRepository outboxEventRepository;
@@ -36,7 +36,7 @@ class GroupBuyJudgmentOutboxPublishServiceUnitTest {
     private GroupBuyOrderCreationStream orderCreationStream;
 
     @InjectMocks
-    private GroupBuyJudgmentOutboxPublishService publishService;
+    private GroupBuyOutboxPublishService publishService;
 
     @Test
     @DisplayName("해피 케이스 - Redis 등록 후 Outbox 발행 완료")
