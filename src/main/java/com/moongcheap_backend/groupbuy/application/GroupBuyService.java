@@ -91,6 +91,7 @@ public class GroupBuyService {
 
     private GroupBuyListResponse toListResponse(GroupBuy groupBuy) {
         return new GroupBuyListResponse(
+            groupBuy.getId(),
             groupBuy.getTitle(),
             groupBuy.getProduct().getThumbnailUrl(),
             groupBuy.getProduct().getUnitPrice()
