@@ -22,7 +22,8 @@ public class GlobalExceptionHandler {
 
     private static final Map<String, ErrorCode> CONSTRAINT_ERROR_MAP = Map.of(
             "uq_shipping_address_default",     ErrorCode.SHIPPING_ADDRESS_DEFAULT_CONFLICT,
-            "uq_demand_member_catalog_active", ErrorCode.DEMAND_ALREADY_EXISTS
+            "uq_demand_member_catalog_active", ErrorCode.DEMAND_ALREADY_EXISTS,
+            "uq_product_catalog_name",         ErrorCode.PRODUCT_CATALOG_DUPLICATED
     );
 
     @ExceptionHandler(BusinessException.class)
