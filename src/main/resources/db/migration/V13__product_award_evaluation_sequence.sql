@@ -8,15 +8,19 @@
  *       INSERT 를 batch 로 묶어 전송할 수 있게 됨.
  * ==========================================================================*/
 
-CREATE SEQUENCE product_award_evaluation_id_seq INCREMENT BY 20;
-
+-- IDENTITY 제거 (소유 중인 auto-sequence 도 함께 삭제됨)
 ALTER TABLE product_award_evaluation
-    ALTER COLUMN id DROP IDENTITY IF EXISTS,
-    ALTER COLUMN id SET DEFAULT nextval('product_award_evaluation_id_seq');
+    ALTER COLUMN id DROP IDENTITY IF EXISTS;
+
+-- IDENTITY sequence 가 삭제된 후 새 sequence 를 생성
+CREATE SEQUENCE IF NOT EXISTS product_award_evaluation_id_seq INCREMENT BY 20;
 
 SELECT setval(
     'product_award_evaluation_id_seq',
     COALESCE((SELECT MAX(id) FROM product_award_evaluation), 1)
 );
+
+ALTER TABLE product_award_evaluation
+    ALTER COLUMN id SET DEFAULT nextval('product_award_evaluation_id_seq');
 
 ALTER SEQUENCE product_award_evaluation_id_seq OWNED BY product_award_evaluation.id;
