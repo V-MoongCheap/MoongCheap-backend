@@ -324,3 +324,23 @@
 
 #### `GET /api/products-search/search` — 상품 검색
 비즈니스 에러 없음.
+
+---
+
+### Payment
+
+#### `POST /api/payments/methods` — 결제수단 등록
+
+현재 별도의 비즈니스 에러가 없습니다.
+
+#### `GET /api/payments/methods` — 결제수단 목록 조회
+
+현재 별도의 비즈니스 에러가 없습니다.
+
+#### `DELETE /api/payments/methods/{paymentMethodId}` — 결제수단 삭제
+
+현재 별도의 비즈니스 에러가 없습니다.
+
+#### `PATCH /api/payments/{paymentId}` — 결제 취소
+
+현재 별도의 비즈니스 에러가 없습니다.

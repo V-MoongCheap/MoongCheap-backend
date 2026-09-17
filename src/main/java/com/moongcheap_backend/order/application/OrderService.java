@@ -26,6 +26,7 @@ import com.moongcheap_backend.payments.presentation.dto.OrderPaymentInfo;
 import com.moongcheap_backend.product.domain.product.Product;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -68,7 +69,7 @@ public class OrderService {
         if (!seller.isSellable()) {
             throw new BusinessException(ErrorCode.SELLER_NOT_APPROVED);
         }
-        if (!product.isAwarded()) {
+        if (!product.isOnSale()) {
             throw new BusinessException(ErrorCode.PRODUCT_NOT_ORDERABLE);
         }
         if (!product.getSellerId().equals(seller.getId())
@@ -84,6 +85,13 @@ public class OrderService {
             product.getDemandBoardId()
         );
 
+        // Stream은 같은 메시지를 다시 전달할 수 있으므로 이미 주문이 된 수요는 제외한다.
+        Set<Long> existingDemandIds = demands.isEmpty()
+            ? Set.of()
+            : new HashSet<>(ordersRepository.findExistingDemandIds(
+                demands.stream().map(Demand::getId).toList()
+            ));
+
         Set<Long> demandMemberIds = demands.stream()
             .map(Demand::getMemberId)
             .collect(Collectors.toSet());
@@ -91,6 +99,7 @@ public class OrderService {
 
         //demand리스트로 order리스트 생성
         List<Orders> orders = demands.stream()
+            .filter(demand -> !existingDemandIds.contains(demand.getId()))
             // 탈퇴하지 않아 deletedAt이 null인 회원의 수요만 주문으로 생성한다.
             .filter(demand -> activeMemberIds.contains(demand.getMemberId()))
             .filter(demand -> product.getUnitPrice() <= demand.getDesiredPriceMax())

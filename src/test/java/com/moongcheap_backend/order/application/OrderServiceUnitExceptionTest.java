@@ -105,9 +105,9 @@ class OrderServiceUnitExceptionTest {
         }
 
         @Test
-        void 낙찰되지_않은_상품이면_주문을_생성할_수_없다() {
+        void 판매중이_아닌_상품이면_주문을_생성할_수_없다() {
             when(seller.isSellable()).thenReturn(true);
-            when(product.isAwarded()).thenReturn(false);
+            when(product.isOnSale()).thenReturn(false);
 
             assertBusinessException(() -> orderService.autoCreateOrder(10L),
                 ErrorCode.PRODUCT_NOT_ORDERABLE);
@@ -173,7 +173,7 @@ class OrderServiceUnitExceptionTest {
 
         private void prepareOrderableSellerAndProduct() {
             when(seller.isSellable()).thenReturn(true);
-            when(product.isAwarded()).thenReturn(true);
+            when(product.isOnSale()).thenReturn(true);
         }
     }
 

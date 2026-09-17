@@ -15,7 +15,7 @@ public class GroupBuyJudgmentOutboxPublisher {
 
     private final GroupBuyJudgmentOutboxPublishService publishService;
 
-    // 짧은 주기로 PENDING Outbox를 Redis Sorted Set에 등록한다.
+    // 짧은 주기로 PENDING Outbox를 이벤트 종류에 맞는 Redis 자료구조에 발행한다.
     @Scheduled(fixedDelayString = "${moongcheap.group-buy.outbox-publish-delay-ms:1000}")
     public void publishPending() {
         publishService.publishBatch(LocalDateTime.now(ZONE_SEOUL), BATCH_SIZE);

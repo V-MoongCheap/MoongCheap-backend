@@ -73,12 +73,17 @@ public class GroupBuyService {
 
         product.startSale();
 
-        // 공동구매와 Outbox를 같은 트랜잭션으로 저장해 Redis 예약 유실을 방지한다.
+        // 공동구매와 Outbox를 같은 트랜잭션으로 저장해 주문 요청과 판정 예약의 유실을 방지한다.
         GroupBuy savedGroupBuy = groupBuyRepository.save(groupBuy);
+        LocalDateTime now = LocalDateTime.now(ZONE_SEOUL);
+        outboxEventRepository.save(OutboxEvent.groupBuyOrderCreationRequested(
+            savedGroupBuy.getId(),
+            now
+        ));
         outboxEventRepository.save(OutboxEvent.groupBuyJudgmentScheduled(
             savedGroupBuy.getId(),
             savedGroupBuy.getGroupBuyEndAt().plusMinutes(JUDGMENT_DELAY_MINUTES),
-            LocalDateTime.now(ZONE_SEOUL)
+            now
         ));
 
         return null;
