@@ -5,7 +5,6 @@ import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.product.domain.productCatalog.ProductCatalog;
 import com.moongcheap_backend.product.infrastructure.productCatalog.ProductCatalogRespository;
-import com.moongcheap_backend.product.presentation.productCatalog.dto.ProductCatalogCreateRequest;
 import com.moongcheap_backend.product.presentation.productCatalog.dto.ProductCatalogDto;
 import com.moongcheap_backend.product.presentation.productCatalog.dto.ProductCatalogSummaryListDto;
 import java.util.List;
@@ -30,22 +29,22 @@ public class ProductCatalogService {
         return ProductCatalogSummaryListDto.from(catalogs);
     }
 
-    @Transactional
-    public Long create(ProductCatalogCreateRequest request) {
-        if (request.categoryId() != null
-            && !categoryRepository.existsById(request.categoryId())) {
-            throw new BusinessException(ErrorCode.CATEGORY_NOT_FOUND);
-        }
-
-        ProductCatalog catalog = ProductCatalog.builder()
-            .name(request.name())
-            .thumbnailUrl(request.thumbnailUrl())
-            .specSummary(request.specSummary())
-            .listPrice(request.listPrice())
-            .description(request.description())
-            .build();
-        return productCatalogRespository.save(catalog).getId();
-    }
+//    @Transactional
+//    public Long create(ProductCatalogCreateRequest request) {
+//        if (request.categoryId() != null
+//            && !categoryRepository.existsById(request.categoryId())) {
+//            throw new BusinessException(ErrorCode.CATEGORY_NOT_FOUND);
+//        }
+//
+//        ProductCatalog catalog = ProductCatalog.builder()
+//            .name(request.name())
+//            .thumbnailUrl(request.thumbnailUrl())
+//            .specSummary(request.specSummary())
+//            .listPrice(request.listPrice())
+//            .description(request.description())
+//            .build();
+//        return productCatalogRespository.save(catalog).getId();
+//    }
 
     @Transactional(readOnly = true)
     public ProductCatalogDto getProductCatalogById(Long id) {
