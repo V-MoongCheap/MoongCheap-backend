@@ -89,6 +89,8 @@ public enum ErrorCode {
 
     // Payments
     BRAND_PAY_METHOD_NOT_FOUND(HttpStatus.NOT_FOUND, "PAY_001", "유효한 결제 수단을 찾을 수 없습니다."),
+    SELLER_KEY_ISSUE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PAY_002", "판매자 식별키 발급에 실패했습니다."),
+    CUSTOMER_KEY_ISSUE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PAY_003", "소비자 식별키 발급에 실패했습니다."),
 
     // Search
     SEARCH_INDEX_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SEARCH_001", "상품 검색 인덱싱에 실패했습니다.");
