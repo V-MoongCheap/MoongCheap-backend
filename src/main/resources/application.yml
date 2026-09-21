@@ -81,6 +81,12 @@ resilience4j:
         record-failure-predicate: com.moongcheap_backend.common.config.OpenSearchFailurePredicate
 
 moongcheap:
+  payments:
+    brand-pay:
+      # 브랜드페이 서버 API의 기본 주소
+      base-url: "https://api.tosspayments.com"
+      # 토큰 발급에 사용하는 서버 전용 시크릿 키. 저장소에 실제 값을 커밋하지 않는다.
+      secret-key: "${TOSS_BRANDPAY_SECRET_KEY:}"
   batch:
     demand-expire:
       cron: "0 5 * * * *"

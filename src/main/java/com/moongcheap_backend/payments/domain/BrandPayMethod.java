@@ -58,4 +58,32 @@ public class BrandPayMethod extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private PaymentsMethodStatus status;
+
+    /** 토스에서 처음 확인된 결제수단을 로컬 자동결제 수단으로 생성한다. */
+    public BrandPayMethod(Member member, String methodKey, ProviderCode providerCode,
+        String maskedNumber, PaymentType type, boolean isDefault) {
+        this.member = member;
+        this.methodKey = methodKey;
+        this.providerCode = providerCode;
+        this.maskedNumber = maskedNumber;
+        this.type = type;
+        this.isDefault = isDefault;
+        this.status = PaymentsMethodStatus.ACTIVE;
+    }
+
+    /** 토스의 최신 조회 결과로 기존 결제수단 표시 정보와 활성 상태를 갱신한다. */
+    public void synchronize(ProviderCode providerCode, String maskedNumber,
+        PaymentType type, boolean isDefault) {
+        this.providerCode = providerCode;
+        this.maskedNumber = maskedNumber;
+        this.type = type;
+        this.isDefault = isDefault;
+        this.status = PaymentsMethodStatus.ACTIVE;
+    }
+
+    /** 토스의 전체 활성 결제수단 응답에서 사라진 수단을 물리 삭제하지 않고 만료 처리한다. */
+    public void expire() {
+        this.isDefault = false;
+        this.status = PaymentsMethodStatus.EXPIRED;
+    }
 }
