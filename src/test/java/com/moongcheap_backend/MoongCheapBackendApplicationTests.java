@@ -1,10 +1,9 @@
 package com.moongcheap_backend;
 
+import com.moongcheap_backend.support.integration.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class MoongCheapBackendApplicationTests {
+class MoongCheapBackendApplicationTests extends AbstractIntegrationTest {
 
     @Test
     void contextLoads() {
