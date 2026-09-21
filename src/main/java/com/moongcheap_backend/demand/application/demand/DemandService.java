@@ -136,8 +136,7 @@ public class DemandService {
             .findAwardedIdAndUnitPriceByBoardIds(boardIds, AWARDED_PRODUCT_STATUSES).stream()
             .collect(Collectors.toMap(
                 row -> (Long) row[0],
-                row -> new DemandListDto.ProductDto((Long) row[1], (Integer) row[2]),
-                (a, b) -> a
+                row -> new DemandListDto.ProductDto((Long) row[1], (Integer) row[2])
             ));
         return items.stream()
             .map(i -> {
