@@ -34,6 +34,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         @Param("boardIds") List<Long> boardIds,
         @Param("status") ProductStatus status);
 
+    @Query("SELECT p.demandBoardId, p.id, p.unitPrice FROM Product p "
+        + "WHERE p.demandBoardId IN :boardIds AND p.status IN :statuses")
+    List<Object[]> findAwardedIdAndUnitPriceByBoardIds(
+        @Param("boardIds") List<Long> boardIds,
+        @Param("statuses") List<ProductStatus> statuses);
+
     default Map<Long, List<Long>> findProductIdsGroupedByBoardId(
         List<Long> boardIds, ProductStatus status) {
         return findBoardIdAndIdByBoardIdsAndStatus(boardIds, status).stream()

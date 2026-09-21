@@ -29,9 +29,15 @@ public record DemandListDto(
         boolean isSubstitutable,
         LocalDateTime createdAt,
         CatalogDto catalog,
-        DemandBoardDto demandBoard
+        DemandBoardDto demandBoard,
+        ProductDto product
     ) {
 
+        public DemandItemDto withProduct(ProductDto product) {
+            return new DemandItemDto(
+                id, status, desiredPriceMin, desiredPriceMax, desireEndAt, quantity,
+                extraRequirement, isSubstitutable, createdAt, catalog, demandBoard, product);
+        }
     }
 
     public record CatalogDto(
@@ -51,6 +57,13 @@ public record DemandListDto(
         Integer priceMax,
         LocalDateTime saleEndAt,
         CatalogDto catalog
+    ) {
+
+    }
+
+    public record ProductDto(
+        Long id,
+        Integer unitPrice
     ) {
 
     }
