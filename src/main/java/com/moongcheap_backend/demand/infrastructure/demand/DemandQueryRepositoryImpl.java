@@ -56,7 +56,8 @@ public class DemandQueryRepositoryImpl implements DemandQueryRepository {
                 rs.getString("catalog_thumbnail_url"),
                 rs.getObject("catalog_list_price", Integer.class)
             ),
-            board
+            board,
+            null
         );
     };
 

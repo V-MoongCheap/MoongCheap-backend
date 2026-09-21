@@ -15,11 +15,15 @@ import com.moongcheap_backend.demand.presentation.demand.dto.DemandCreateRequest
 import com.moongcheap_backend.demand.presentation.demand.dto.DemandListDto;
 import com.moongcheap_backend.payments.domain.enums.PaymentsMethodStatus;
 import com.moongcheap_backend.payments.infrastructure.BrandPayMethodRepository;
+import com.moongcheap_backend.product.domain.product.ProductStatus;
 import com.moongcheap_backend.product.domain.productCatalog.ProductCatalogStatus;
+import com.moongcheap_backend.product.infrastructure.product.ProductRepository;
 import com.moongcheap_backend.product.infrastructure.productCatalog.ProductCatalogRespository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -37,6 +41,18 @@ public class DemandService {
     private final DemandBoardRepository demandBoardRepository;
     private final RejectHistoryRepository rejectHistoryRepository;
     private final BrandPayMethodRepository brandPayMethodRepository;
+    private final ProductRepository productRepository;
+
+    private static final Set<DemandStatus> PRODUCT_ATTACHED_STATUSES = Set.of(
+        DemandStatus.PAYMENT_PENDING,
+        DemandStatus.CLOSED
+    );
+
+    private static final List<ProductStatus> AWARDED_PRODUCT_STATUSES = List.of(
+        ProductStatus.AWARDED,
+        ProductStatus.ON_SALE,
+        ProductStatus.SOLD_OUT
+    );
 
     @Transactional
     public Long create(DemandCreateRequestDto request, Long memberId) {
@@ -88,8 +104,10 @@ public class DemandService {
 
     @Transactional(readOnly = true)
     public DemandListDto.DemandItemDto get(Long memberId, Long demandId) {
-        return demandQueryRepository.findDemandItemByIdAndMemberId(demandId, memberId)
+        DemandListDto.DemandItemDto item = demandQueryRepository
+            .findDemandItemByIdAndMemberId(demandId, memberId)
             .orElseThrow(() -> new BusinessException(ErrorCode.DEMAND_NOT_FOUND));
+        return attachProducts(List.of(item)).get(0);
     }
 
     @Transactional(readOnly = true)
@@ -100,7 +118,36 @@ public class DemandService {
             demandQueryRepository.findDemandItemsByMemberId(memberId,
                 statuses != null ? statuses : ACTIVE_STATUSES,
                 fetchPageable);
-        return DemandListDto.of(items, pageable);
+        return DemandListDto.of(attachProducts(items), pageable);
+    }
+
+    private List<DemandListDto.DemandItemDto> attachProducts(
+        List<DemandListDto.DemandItemDto> items) {
+        List<Long> boardIds = items.stream()
+            .filter(i -> PRODUCT_ATTACHED_STATUSES.contains(i.status()))
+            .filter(i -> i.demandBoard() != null)
+            .map(i -> i.demandBoard().id())
+            .distinct()
+            .toList();
+        if (boardIds.isEmpty()) {
+            return items;
+        }
+        Map<Long, DemandListDto.ProductDto> productByBoardId = productRepository
+            .findAwardedIdAndUnitPriceByBoardIds(boardIds, AWARDED_PRODUCT_STATUSES).stream()
+            .collect(Collectors.toMap(
+                row -> (Long) row[0],
+                row -> new DemandListDto.ProductDto((Long) row[1], (Integer) row[2])
+            ));
+        return items.stream()
+            .map(i -> {
+                if (!PRODUCT_ATTACHED_STATUSES.contains(i.status())
+                    || i.demandBoard() == null) {
+                    return i;
+                }
+                DemandListDto.ProductDto product = productByBoardId.get(i.demandBoard().id());
+                return product == null ? i : i.withProduct(product);
+            })
+            .toList();
     }
 
     /**
