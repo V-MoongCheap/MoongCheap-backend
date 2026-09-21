@@ -91,7 +91,7 @@ moongcheap:
       lock-duration: 10m
     encryption:
       # 64자 hex 문자열(32바이트) 권장. 프로파일별 파일에서 오버라이드
-      password: "${MOONGCHEAP_ENC_PASSWORD:}"
-      salt: "${MOONGCHEAP_ENC_SALT:}"
+      password: "${MOONGCHEAP_ENC_PASSWORD:hlNdwmESwJz11xZdpyAaadY7JOkB9qdo}"
+      salt: "${MOONGCHEAP_ENC_SALT:dc3eee6f931d5dd91c5a8516716caa4e}"
     # 내부 API 인증 키. 추후 AWS Parameter Store로 관리 예정
     internal-api-key: "${MOONGCHEAP_INTERNAL_API_KEY:}"

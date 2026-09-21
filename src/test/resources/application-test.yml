@@ -1,0 +1,59 @@
+spring:
+  # datasource / redis 는 AbstractIntegrationTest 에서 TestContainers 로 주입한다.
+  datasource:
+    hikari:
+      connection-init-sql: "SET TIME ZONE 'Asia/Seoul'"
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc.time_zone: Asia/Seoul
+
+opensearch:
+  host: localhost
+  port: 9200
+  scheme: http
+  auto-create-indices: false
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+
+moongcheap:
+  cors:
+    allowed-origins: "http://localhost:3000"
+  oauth:
+    redirect-base-url: "http://localhost:3000"
+  security:
+    encryption:
+      password: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      salt: "0123456789abcdef0123456789abcdef"
+    internal-api-key: "test-internal-api-key"
+  oauth2:
+    kakao:
+      admin-key: "test-kakao-admin-key"
+
+spring.security.oauth2.client.registration:
+  kakao:
+    client-id: "test-kakao-client-id"
+    client-secret: "test-kakao-client-secret"
+    client-authentication-method: client_secret_post
+    authorization-grant-type: authorization_code
+    redirect-uri: "{baseUrl}/login/oauth2/code/kakao"
+    scope: profile_nickname, account_email
+    client-name: Kakao
+  google:
+    client-id: "test-google-client-id"
+    client-secret: "test-google-client-secret"
+    scope: profile, email
+
+spring.security.oauth2.client.provider:
+  kakao:
+    authorization-uri: https://kauth.kakao.com/oauth/authorize
+    token-uri: https://kauth.kakao.com/oauth/token
+    user-info-uri: https://kapi.kakao.com/v2/user/me
+    user-name-attribute: id

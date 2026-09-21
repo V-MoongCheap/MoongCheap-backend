@@ -1,8 +1,8 @@
 package com.moongcheap_backend.demand.infrastructure.demand;
 
+import com.moongcheap_backend.common.util.JdbcTimeMapper;
 import com.moongcheap_backend.demand.domain.demand.DemandStatus;
 import com.moongcheap_backend.demand.presentation.demand.dto.DemandListDto;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,7 +36,7 @@ public class DemandQueryRepositoryImpl implements DemandQueryRepository {
                 rs.getInt("participant_count"),
                 rs.getObject("board_price_min", Integer.class),
                 rs.getObject("board_price_max", Integer.class),
-                rs.getObject("board_sale_end_at", LocalDateTime.class),
+                JdbcTimeMapper.toLocalDateTime(rs, "board_sale_end_at"),
                 boardCatalog
             );
         return new DemandListDto.DemandItemDto(
@@ -44,11 +44,11 @@ public class DemandQueryRepositoryImpl implements DemandQueryRepository {
             DemandStatus.valueOf(rs.getString("status")),
             rs.getObject("desired_price_min", Integer.class),
             rs.getObject("desired_price_max", Integer.class),
-            rs.getObject("desire_end_at", LocalDateTime.class),
+            JdbcTimeMapper.toLocalDateTime(rs, "desire_end_at"),
             rs.getObject("quantity", Integer.class),
             rs.getString("extra_requirement"),
             rs.getBoolean("is_substitutable"),
-            rs.getObject("created_at", LocalDateTime.class),
+            JdbcTimeMapper.toLocalDateTime(rs, "created_at"),
             new DemandListDto.CatalogDto(
                 rs.getLong("catalog_id"),
                 rs.getString("catalog_name"),
