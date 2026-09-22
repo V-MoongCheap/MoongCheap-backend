@@ -1,11 +1,13 @@
 package com.moongcheap_backend.demand.infrastructure.demandBoard;
 
+import com.moongcheap_backend.common.util.JdbcTimeMapper;
 import com.moongcheap_backend.demand.domain.demand.DemandStatus;
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoardStatus;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.AuctionResultDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.AwardingPendingResponseDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.CatalogDemandBoardListDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.DemandBoardSummaryDto;
+import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,7 +37,7 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
         rs.getInt("seller_count"),
         rs.getObject("board_price_min", Integer.class),
         rs.getObject("board_price_max", Integer.class),
-        rs.getObject("board_sale_end_at", LocalDateTime.class)
+        JdbcTimeMapper.toLocalDateTime(rs, "board_sale_end_at")
     );
 
     private static final String SELECT_COLUMNS = """
@@ -107,7 +109,7 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
             rs.getInt("seller_count"),
             rs.getObject("price_min", Integer.class),
             rs.getObject("price_max", Integer.class),
-            rs.getObject("sale_end_at", LocalDateTime.class),
+            JdbcTimeMapper.toLocalDateTime(rs, "sale_end_at"),
             rs.getBoolean("is_participating")
         );
 
@@ -153,8 +155,8 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
             .addValue("memberId", memberId)
             .addValue("limit", pageable.getPageSize())
             .addValue("offset", pageable.getOffset())
-            .addValue("minPrice", minPrice)
-            .addValue("maxPrice", maxPrice);
+            .addValue("minPrice", minPrice, Types.INTEGER)
+            .addValue("maxPrice", maxPrice, Types.INTEGER);
         return jdbcTemplate.query(BY_CATALOG_QUERY, params, CATALOG_MAPPER);
     }
 
@@ -210,7 +212,7 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
             rs.getObject("quantity", Integer.class),
             rs.getObject("participant_count", Integer.class),
             rs.getObject("total_participant_quantity", Long.class),
-            rs.getObject("judged_at", LocalDateTime.class),
+            JdbcTimeMapper.toLocalDateTime(rs, "judged_at"),
             rs.getString("award_reason")
         );
 
@@ -267,8 +269,8 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
                 rs.getLong("catalog_id"),
                 rs.getObject("price_min", Integer.class),
                 rs.getObject("price_max", Integer.class),
-                rs.getObject("sale_end_at", LocalDateTime.class),
-                rs.getObject("calculation_started_at", LocalDateTime.class),
+                JdbcTimeMapper.toLocalDateTime(rs, "sale_end_at"),
+                JdbcTimeMapper.toLocalDateTime(rs, "calculation_started_at"),
                 rs.getInt("participant_count"),
                 rs.getLong("total_quantity")
             )

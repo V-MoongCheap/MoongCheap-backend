@@ -21,7 +21,7 @@ public class DemandExpireScheduler {
     private final DemandExpireChunkService chunkService;
 
     // error시 방어로직 x, batch 시간 또한 테스트 필요
-    @Scheduled(cron = "${moongcheap.batch.demand-expire.cron:0 5 * * * *}", zone = "Asia/Seoul")
+    @Scheduled(cron = "${moongcheap.batch.demand-expire.cron}", zone = "Asia/Seoul")
     public void expireOverdueUnassigned() {
         LocalDateTime threshold = LocalDateTime.now(ZONE_SEOUL);
         long start = System.currentTimeMillis();

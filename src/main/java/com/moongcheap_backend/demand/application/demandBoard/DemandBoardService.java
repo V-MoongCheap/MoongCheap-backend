@@ -41,8 +41,6 @@ import com.moongcheap_backend.product.domain.product.ProductStatus;
 import com.moongcheap_backend.product.domain.productAwardEvaluation.ProductAwardEvaluation;
 import com.moongcheap_backend.product.infrastructure.product.ProductRepository;
 import com.moongcheap_backend.product.infrastructure.productAwardEvaluation.ProductAwardEvaluationRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -80,9 +78,6 @@ public class DemandBoardService {
     @Lazy
     @Autowired
     private DemandBoardService self;
-
-    @PersistenceContext
-    private EntityManager entityManager;
 
     @Transactional(readOnly = true)
     public boolean hasProductBoard(Long productBoardId) {

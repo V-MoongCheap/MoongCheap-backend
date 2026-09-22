@@ -12,6 +12,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.SessionManagementConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -38,7 +39,10 @@ public class SecurityConfig {
             .addFilterAfter(incompleteSignupFilter, SessionAuthenticationFilter.class)
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
-            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+            .sessionManagement(sm -> sm
+                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                // 세션 재발급은 로그인/권한 변경 지점에서 직접 처리한다.
+                .sessionFixation(SessionManagementConfigurer.SessionFixationConfigurer::none))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET,
                     "/api/group-buys",
@@ -61,7 +65,9 @@ public class SecurityConfig {
                     "/api/products-search/internal/**",
                     "/api/products-search/internal",
                     "/api/demand-boards/internal/**",
-                    "/api/awarding/**"
+                    "/api/awarding/**",
+                    "/actuator/health",
+                    "/actuator/prometheus"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

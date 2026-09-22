@@ -98,8 +98,7 @@ public class DemandService {
     private static final Set<DemandStatus> CANCELABLE_STATUSES = Set.of(
         DemandStatus.UNASSIGNED,
         DemandStatus.SUBSTITUTE_OFFERED,
-        DemandStatus.ASSIGNED,
-        DemandStatus.PAYMENT_PENDING
+        DemandStatus.ASSIGNED
     );
 
     @Transactional(readOnly = true)
@@ -116,7 +115,7 @@ public class DemandService {
             pageable.getPageNumber(), pageable.getPageSize() + 1, pageable.getSort());
         List<DemandListDto.DemandItemDto> items =
             demandQueryRepository.findDemandItemsByMemberId(memberId,
-                statuses != null ? statuses : ACTIVE_STATUSES,
+                statuses != null && !statuses.isEmpty() ? statuses : ACTIVE_STATUSES,
                 fetchPageable);
         return DemandListDto.of(attachProducts(items), pageable);
     }
@@ -151,7 +150,8 @@ public class DemandService {
     }
 
     /**
-     * DEMAND STATUS가 ASSIGNED, PAYMENT_PENDING 일 때에만 DEMANDBOARD의 참여자 수 감소 그 외에 CANCEL은 감소 X
+     * DEMAND STATUS가 ASSIGNED 일 때에만 DEMANDBOARD의 참여자 수 감소 그 외에 CANCEL은 감소 X
+     * PAYMENT_PENDING상태는취소불가(CANCELABLE_STATUSES에서 제외)
      */
     @Transactional
     public void cancel(Long memberId, Long demandId) {
@@ -164,8 +164,7 @@ public class DemandService {
             throw new BusinessException(ErrorCode.DEMAND_CANCEL_NOT_ALLOWED);
         }
         boolean shouldDecrement = demand.getDemandBoardId() != null
-            && (demand.getStatus() == DemandStatus.ASSIGNED
-            || demand.getStatus() == DemandStatus.PAYMENT_PENDING);
+            && demand.getStatus() == DemandStatus.ASSIGNED;
         demand.cancel();
         if (shouldDecrement) {
             demandBoardRepository.decrementParticipantCount(demand.getDemandBoardId());

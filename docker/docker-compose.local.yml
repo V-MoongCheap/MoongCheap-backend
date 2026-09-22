@@ -60,7 +60,19 @@ services:
       timeout: 5s
       retries: 10
 
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: moongcheap-prometheus-local
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - moongcheap-prometheus-data:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   moongcheap-postgres-data:
   moongcheap-redis-data:
   moongcheap-opensearch-data:
+  moongcheap-prometheus-data:

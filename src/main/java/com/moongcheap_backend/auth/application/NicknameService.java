@@ -4,15 +4,13 @@ import com.moongcheap_backend.auth.domain.NicknameValidator;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.member.infrastructure.MemberRepository;
-import io.swagger.v3.core.util.ReferenceTypeUtils;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -36,12 +34,12 @@ public class NicknameService {
     @Transactional(readOnly = true)
     public String allocateForSocial(String candidate) {
         String base = NicknameValidator.toKey(NicknameValidator.normalize(
-                candidate == null || candidate.isBlank() ? "user" : candidate));
+            candidate == null || candidate.isBlank() ? "user" : candidate));
 
         List<String> candidates = new ArrayList<>(10);
         candidates.add(base);
         while (candidates.size() < 10) {
-            int suffix = ThreadLocalRandom.current().nextInt(1000, 100000);
+            int suffix = ThreadLocalRandom.current().nextInt(1000, 10000000);
             String name = truncate(base, 20 - String.valueOf(suffix).length()) + suffix;
             if (!candidates.contains(name)) {
                 candidates.add(name);
@@ -50,9 +48,10 @@ public class NicknameService {
 
         Set<String> taken = memberRepository.findTakenNicknames(candidates);
         return candidates.stream()
-                .filter(name -> !taken.contains(name))
-                .findFirst()
-                .orElseThrow(() -> new BusinessException(ErrorCode.NICKNAME_DUPLICATED, "닉네임 자동 발급에 실패했습니다."));
+            .filter(name -> !taken.contains(name))
+            .findFirst()
+            .orElseThrow(
+                () -> new BusinessException(ErrorCode.NICKNAME_DUPLICATED, "닉네임 자동 발급에 실패했습니다."));
     }
 
     private String truncate(String s, int max) {

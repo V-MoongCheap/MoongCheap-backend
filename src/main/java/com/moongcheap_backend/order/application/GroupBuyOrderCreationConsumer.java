@@ -23,7 +23,7 @@ public class GroupBuyOrderCreationConsumer {
     private final String consumerName = "order-creator-" + UUID.randomUUID();
 
     // 새 메시지와 처리 중 워커가 종료되어 남은 메시지를 함께 소비한다.
-    @Scheduled(fixedDelayString = "${moongcheap.group-buy.order-consume-delay-ms:1000}")
+    @Scheduled(fixedDelayString = "${moongcheap.group-buy.order-consume-delay-ms}")
     public void consume() {
         try {
             process(orderCreationStream.claimStale(

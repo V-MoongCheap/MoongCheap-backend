@@ -33,6 +33,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
     implementation 'me.paulschwarz:springboot4-dotenv:5.1.0'
     implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1'
@@ -53,6 +54,9 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-session-data-redis-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter:1.20.4'
+    testImplementation 'org.testcontainers:postgresql:1.20.4'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -60,6 +64,7 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty 'user.timezone', 'Asia/Seoul'
     finalizedBy tasks.named('jacocoTestReport')
 }
 

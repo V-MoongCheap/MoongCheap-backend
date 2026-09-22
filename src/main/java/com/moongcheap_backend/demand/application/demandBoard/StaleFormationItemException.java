@@ -1,4 +1,5 @@
 package com.moongcheap_backend.demand.application.demandBoard;
 
-class StaleFormationItemException extends RuntimeException {
+public class StaleFormationItemException extends RuntimeException {
+
 }

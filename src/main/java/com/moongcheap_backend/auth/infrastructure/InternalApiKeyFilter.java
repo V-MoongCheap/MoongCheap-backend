@@ -26,6 +26,9 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
     @Value("${moongcheap.security.internal-api-key}")
     private String internalApiKey;
 
+    @Value("${moongcheap.security.internal-api-key-bypass:false}")
+    private boolean bypass;
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
@@ -35,6 +38,10 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
         FilterChain filterChain) throws ServletException, IOException {
+        if (bypass) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         String key = request.getHeader(HEADER_NAME);
         if (internalApiKey.isBlank() || !internalApiKey.equals(key)) {
             writeUnauthorized(response);
