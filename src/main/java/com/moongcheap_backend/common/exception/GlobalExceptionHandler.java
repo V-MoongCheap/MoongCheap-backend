@@ -3,7 +3,7 @@ package com.moongcheap_backend.common.exception;
 import com.moongcheap_backend.common.response.ApiError;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -21,9 +21,12 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     private static final Map<String, ErrorCode> CONSTRAINT_ERROR_MAP = Map.of(
-            "uq_shipping_address_default",     ErrorCode.SHIPPING_ADDRESS_DEFAULT_CONFLICT,
-            "uq_demand_member_catalog_active", ErrorCode.DEMAND_ALREADY_EXISTS,
-            "uq_product_catalog_name",         ErrorCode.PRODUCT_CATALOG_DUPLICATED
+            "uq_shipping_address_default",       ErrorCode.SHIPPING_ADDRESS_DEFAULT_CONFLICT,
+            "uq_demand_member_catalog_active",   ErrorCode.DEMAND_ALREADY_EXISTS,
+            "uq_product_catalog_name",           ErrorCode.PRODUCT_CATALOG_DUPLICATED,
+            "uq_seller_business_number_hash",    ErrorCode.BUSINESS_NUMBER_DUPLICATED,
+            "uq_seller_member_id",               ErrorCode.SELLER_ALREADY_REGISTERED,
+            "PK_NOTIFICATION_OPT_OUT",           ErrorCode.CONCURRENT_REQUEST_CONFLICT
     );
 
     @ExceptionHandler(BusinessException.class)
@@ -78,8 +81,8 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of(ec.getCode(), ec.getMessage()));
     }
 
-    @ExceptionHandler(CannotAcquireLockException.class)
-    public ResponseEntity<ApiError> handleLockTimeout(CannotAcquireLockException e) {
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<ApiError> handleLockFailure(PessimisticLockingFailureException e) {
         ErrorCode ec = ErrorCode.CONCURRENT_REQUEST_CONFLICT;
         return ResponseEntity.status(ec.getStatus())
                 .body(ApiError.of(ec.getCode(), ec.getMessage()));

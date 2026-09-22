@@ -28,7 +28,7 @@ public class AwardingController {
     @Operation(summary = "AI 판정 대기 보드 조회 (내부 API)",
         description = "GB_AWARDING 상태 보드 중 오래된 순으로 최대 size개를 반환합니다. "
             + "처리된 보드는 GB_AWARDING에서 빠지므로 클라이언트는 결과 없음이 나올 때까지 반복 호출하면 됩니다.")
-    @GetMapping("/pending")
+    @GetMapping("/internal/pending")
     public AwardingPendingResponseDto getPendingAwarding(
         @RequestParam(defaultValue = "50") @Min(1) @Max(100) int size) {
         return demandBoardService.getPendingAwarding(size);

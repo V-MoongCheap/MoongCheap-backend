@@ -1,5 +1,6 @@
 package com.moongcheap_backend.auth.unit.application.success;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -10,12 +11,10 @@ import static org.mockito.Mockito.when;
 import com.moongcheap_backend.auth.application.NicknameService;
 import com.moongcheap_backend.auth.application.PrincipalFactory;
 import com.moongcheap_backend.auth.application.SocialSignupCompleteService;
-import com.moongcheap_backend.auth.infrastructure.session.AuthSessionManager;
 import com.moongcheap_backend.auth.presentation.dto.SocialSignupCompleteRequestDto;
 import com.moongcheap_backend.common.security.SessionPrincipal;
 import com.moongcheap_backend.member.domain.Member;
 import com.moongcheap_backend.member.infrastructure.MemberRepository;
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -31,7 +30,6 @@ class SocialSignupCompleteServiceSuccessTest {
     @Mock private MemberRepository memberRepository;
     @Mock private NicknameService nicknameService;
     @Mock private PrincipalFactory principalFactory;
-    @Mock private AuthSessionManager sessionManager;
 
     @InjectMocks
     private SocialSignupCompleteService socialSignupCompleteService;
@@ -44,7 +42,6 @@ class SocialSignupCompleteServiceSuccessTest {
         void 닉네임_없이_소셜_가입을_완료한다() {
             Long memberId = 1L;
             SocialSignupCompleteRequestDto dto = new SocialSignupCompleteRequestDto(true, true, true, null);
-            HttpServletRequest request = mock(HttpServletRequest.class);
 
             Member member = mock(Member.class);
             when(member.isTermsAgreed()).thenReturn(false);
@@ -53,10 +50,10 @@ class SocialSignupCompleteServiceSuccessTest {
             when(memberRepository.findByIdAndDeletedAtIsNull(memberId)).thenReturn(Optional.of(member));
             when(principalFactory.build(member)).thenReturn(principal);
 
-            socialSignupCompleteService.complete(memberId, dto, request);
+            SessionPrincipal result = socialSignupCompleteService.complete(memberId, dto);
 
             verify(member).agreeTerms();
-            verify(sessionManager).refreshPrincipal(request, principal);
+            assertThat(result).isSameAs(principal);
             verify(member, never()).changeProfile(any(), any(), any(), any());
         }
 
@@ -65,7 +62,6 @@ class SocialSignupCompleteServiceSuccessTest {
             Long memberId = 1L;
             String newNickname = "새닉네임";
             SocialSignupCompleteRequestDto dto = new SocialSignupCompleteRequestDto(true, true, true, newNickname);
-            HttpServletRequest request = mock(HttpServletRequest.class);
 
             Member member = mock(Member.class);
             when(member.isTermsAgreed()).thenReturn(false);
@@ -75,12 +71,12 @@ class SocialSignupCompleteServiceSuccessTest {
             when(memberRepository.findByIdAndDeletedAtIsNull(memberId)).thenReturn(Optional.of(member));
             when(principalFactory.build(member)).thenReturn(principal);
 
-            socialSignupCompleteService.complete(memberId, dto, request);
+            SessionPrincipal result = socialSignupCompleteService.complete(memberId, dto);
 
             verify(nicknameService).ensureAvailable("새닉네임");
             verify(member).changeProfile(eq("새닉네임"), any(), any(), any());
             verify(member).agreeTerms();
-            verify(sessionManager).refreshPrincipal(request, principal);
+            assertThat(result).isSameAs(principal);
         }
     }
 }

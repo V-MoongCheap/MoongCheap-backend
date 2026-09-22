@@ -89,12 +89,11 @@ class ShippingAddressServiceSuccessTest {
             when(shippingAddressRepository.findById(addressId))
                 .thenReturn(Optional.of(address));
             when(encryptionService.decrypt("encrypted")).thenReturn("01012345678");
-            when(encryptionService.maskPhoneNumber("01012345678"))
-                .thenReturn("010-****-5678");
 
             ShippingAddressResponseDto result = service.getById(memberId, addressId);
 
-            assertThat(result.phoneNumberMasked()).isEqualTo("010-****-5678");
+            assertThat(result.phoneNumberMasked()).isEqualTo("01012345678");
+            verify(encryptionService, never()).maskPhoneNumber(anyString());
         }
     }
 

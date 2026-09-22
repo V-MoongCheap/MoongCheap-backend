@@ -1,31 +1,37 @@
 package com.moongcheap_backend.notification.concurrency;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 
-import com.moongcheap_backend.notification.application.NotificationSettingService;
 import com.moongcheap_backend.notification.domain.NotificationType;
 import com.moongcheap_backend.notification.infrastructure.NotificationOptOutRepository;
 import com.moongcheap_backend.support.concurrency.AbstractConcurrencyTest;
 import com.moongcheap_backend.support.concurrency.ConcurrencyRunner;
 import com.moongcheap_backend.support.integration.MemberFixture;
+import com.moongcheap_backend.support.integration.SessionTestHelper;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 @DisplayName("동시성 3-2: opt-out 저장/삭제 인터리브")
 class NotificationOptOutInterleaveConcurrencyTest extends AbstractConcurrencyTest {
 
-    @Autowired private NotificationSettingService notificationSettingService;
     @Autowired private NotificationOptOutRepository notificationOptOutRepository;
     @Autowired private MemberFixture memberFixture;
+    @Autowired private SessionTestHelper sessionTestHelper;
 
     private Long memberId;
+    private Cookie sessionCookie;
 
     @BeforeEach
     void setUp() {
         dbCleaner.clearAll();
         memberId = memberFixture.save("인터리브유저").getId();
+        sessionCookie = sessionTestHelper.loginAs(memberId);
     }
 
     @Test
@@ -33,12 +39,26 @@ class NotificationOptOutInterleaveConcurrencyTest extends AbstractConcurrencyTes
     void interleavedEnableDisableIsIdempotent() throws Exception {
         int threadCount = 50; // 짝수여야 enable/disable이 균등하게 섞임
         ConcurrencyRunner.Result result = ConcurrencyRunner.run(threadCount, idx -> {
-            notificationSettingService.edit(memberId, NotificationType.DEMAND_REGISTERED,
-                idx % 2 == 0);
-            return true;
+            boolean enabled = idx % 2 == 0;
+            MockHttpServletResponse response = mockMvc.perform(
+                    patch("/api/members/me/notification-settings/{type}", NotificationType.DEMAND_REGISTERED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\": " + enabled + "}")
+                        .cookie(sessionCookie))
+                .andReturn()
+                .getResponse();
+
+            if (response.getStatus() == 204) {
+                return true;
+            }
+            if (response.getStatus() == 409) {
+                return false;
+            }
+            throw new AssertionError(
+                "예상치 못한 응답: status=" + response.getStatus()
+                    + " body=" + response.getContentAsString());
         });
 
-        // 각 요청은 idempotent이므로 성공/실패 카운트만 검증하지 않고 최종 로우 수만 확인
         assertThat(result.total()).isEqualTo(threadCount);
         long count = notificationOptOutRepository.findAllByMemberId(memberId).stream()
             .filter(o -> o.getType() == NotificationType.DEMAND_REGISTERED)

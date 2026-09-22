@@ -37,6 +37,15 @@ server:
         same-site: lax
         path: /
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 springdoc:
   api-docs:
     enabled: true
@@ -83,6 +92,8 @@ moongcheap:
     order-consume-delay-ms: 1000
     judgment-poll-delay-ms: 10000
   security:
+    # 환경 명칭
+    active-env: "test"
     session:
       absolute-ttl-default: 24h
       absolute-ttl-remember-me: 14d

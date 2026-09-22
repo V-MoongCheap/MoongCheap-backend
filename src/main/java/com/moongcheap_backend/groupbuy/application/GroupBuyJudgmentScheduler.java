@@ -23,7 +23,7 @@ public class GroupBuyJudgmentScheduler {
     private final GroupBuyJudgmentService judgmentService;
 
     // Sorted Set은 작업을 자동 삭제하지 않으므로 완료된 판정만 명시적으로 제거한다.
-    @Scheduled(fixedDelayString = "${moongcheap.group-buy.judgment-poll-delay-ms:10000}")
+    @Scheduled(fixedDelayString = "${moongcheap.group-buy.judgment-poll-delay-ms}")
     public void judgeDueGroupBuys() {
         Set<String> dueGroupBuyIds = judgmentSchedule.findDue(
             LocalDateTime.now(ZONE_SEOUL), BATCH_SIZE);

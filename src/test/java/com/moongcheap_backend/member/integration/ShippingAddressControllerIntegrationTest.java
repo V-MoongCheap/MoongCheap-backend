@@ -97,7 +97,8 @@ class ShippingAddressControllerIntegrationTest extends AbstractIntegrationTest {
             mockMvc.perform(get("/api/shipping-addresses/" + addr.getId()).cookie(sessionCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(addr.getId()))
-                .andExpect(jsonPath("$.alias").value("집"));
+                .andExpect(jsonPath("$.alias").value("집"))
+                .andExpect(jsonPath("$.phoneNumberMasked").value("01012345678"));
         }
     }
 

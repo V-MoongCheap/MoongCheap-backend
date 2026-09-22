@@ -20,7 +20,7 @@ public class DemandBoardCancelScheduler {
 
     private final DemandBoardCancelChunkService chunkService;
 
-    @Scheduled(cron = "${moongcheap.batch.demand-board-cancel.cron:0 5 * * * *}", zone = "Asia/Seoul")
+    @Scheduled(cron = "${moongcheap.batch.demand-board-cancel.cron}", zone = "Asia/Seoul")
     public void cancelOverdueGatheringBoards() {
         LocalDateTime threshold = LocalDateTime.now(ZONE_SEOUL);
         long start = System.currentTimeMillis();

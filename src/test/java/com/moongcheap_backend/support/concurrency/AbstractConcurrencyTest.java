@@ -4,7 +4,7 @@ import com.moongcheap_backend.support.integration.AbstractIntegrationTest;
 
 /**
  * 동시성 테스트 베이스. {@link AbstractIntegrationTest}의 TestContainers 셋업과 프로파일을 재사용한다.
- * MockMvc는 사용하지 않고 서비스/리포지토리 빈을 직접 호출한다.
+ * DB 제약 위반이 GlobalExceptionHandler를 통해 처리되어야 하는 경우 MockMvc로 컨트롤러를 호출한다.
  */
 public abstract class AbstractConcurrencyTest extends AbstractIntegrationTest {
 }

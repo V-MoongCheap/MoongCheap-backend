@@ -1,6 +1,7 @@
 package com.moongcheap_backend.member.concurrency;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.member.application.ShippingAddressService;
@@ -9,11 +10,14 @@ import com.moongcheap_backend.member.infrastructure.ShippingAddressRepository;
 import com.moongcheap_backend.support.concurrency.AbstractConcurrencyTest;
 import com.moongcheap_backend.support.concurrency.ConcurrencyRunner;
 import com.moongcheap_backend.support.integration.MemberFixture;
+import com.moongcheap_backend.support.integration.SessionTestHelper;
 import com.moongcheap_backend.support.integration.ShippingAddressFixture;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockHttpServletResponse;
 
 @DisplayName("동시성 2-3/2-4: 배송지 기본 지정/삭제")
 class ShippingAddressDefaultDeleteConcurrencyTest extends AbstractConcurrencyTest {
@@ -22,13 +26,16 @@ class ShippingAddressDefaultDeleteConcurrencyTest extends AbstractConcurrencyTes
     @Autowired private ShippingAddressRepository shippingAddressRepository;
     @Autowired private MemberFixture memberFixture;
     @Autowired private ShippingAddressFixture shippingAddressFixture;
+    @Autowired private SessionTestHelper sessionTestHelper;
 
     private Long memberId;
+    private Cookie sessionCookie;
 
     @BeforeEach
     void setUp() {
         dbCleaner.clearAll();
         memberId = memberFixture.save("주소유저").getId();
+        sessionCookie = sessionTestHelper.loginAs(memberId);
     }
 
     @Test
@@ -40,8 +47,21 @@ class ShippingAddressDefaultDeleteConcurrencyTest extends AbstractConcurrencyTes
 
         ConcurrencyRunner.Result result = ConcurrencyRunner.run(2, idx -> {
             Long target = idx == 0 ? b.getId() : c.getId();
-            shippingAddressService.markAsDefault(memberId, target);
-            return true;
+            MockHttpServletResponse response = mockMvc.perform(
+                    patch("/api/shipping-addresses/{id}/default", target)
+                        .cookie(sessionCookie))
+                .andReturn()
+                .getResponse();
+
+            if (response.getStatus() == 204) {
+                return true;
+            }
+            if (response.getStatus() == 409) {
+                return false;
+            }
+            throw new AssertionError(
+                "예상치 못한 응답: status=" + response.getStatus()
+                    + " body=" + response.getContentAsString());
         });
 
         long defaultCount = shippingAddressRepository

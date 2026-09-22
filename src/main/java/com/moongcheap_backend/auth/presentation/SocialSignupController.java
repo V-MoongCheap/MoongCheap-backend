@@ -1,6 +1,7 @@
 package com.moongcheap_backend.auth.presentation;
 
 import com.moongcheap_backend.auth.application.SocialSignupCompleteService;
+import com.moongcheap_backend.auth.infrastructure.session.AuthSessionManager;
 import com.moongcheap_backend.auth.presentation.dto.SocialSignupCompleteRequestDto;
 import com.moongcheap_backend.common.security.SessionPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SocialSignupController {
 
     private final SocialSignupCompleteService socialSignupCompleteService;
+    private final AuthSessionManager sessionManager;
 
     @Operation(summary = "소셜 가입 완료", description = "FN-B01-02. 약관 동의 및 선택적 닉네임 설정으로 소셜 가입을 완료한다.")
     @PostMapping("/complete")
@@ -28,7 +30,9 @@ public class SocialSignupController {
         SessionPrincipal principal,
         @RequestBody @Valid SocialSignupCompleteRequestDto request,
         HttpServletRequest httpRequest) {
-        socialSignupCompleteService.complete(principal.memberId(), request, httpRequest);
+        SessionPrincipal refreshed = socialSignupCompleteService.complete(principal.memberId(), request);
+        httpRequest.changeSessionId();
+        sessionManager.refreshPrincipal(httpRequest, refreshed);
         return ResponseEntity.noContent().build();
     }
 }

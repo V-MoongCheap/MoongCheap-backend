@@ -44,7 +44,7 @@ public final class ConcurrencyRunner {
                     } else {
                         failure.incrementAndGet();
                     }
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     errors.add(e);
                 } finally {
                     done.countDown();
