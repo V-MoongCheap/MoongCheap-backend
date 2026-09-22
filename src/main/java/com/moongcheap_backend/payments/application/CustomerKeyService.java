@@ -7,6 +7,7 @@ import com.moongcheap_backend.payments.domain.CustomerKey;
 import com.moongcheap_backend.payments.presentation.dto.GetCustomerKeyResponse;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +19,13 @@ public class CustomerKeyService {
     private static final String CUSTOMER_KEY_UNIQUE_CONSTRAINT = "uq_customer_key";
 
     private final CustomerKeyIssueTransactionService issueTransactionService;
+
+    /**
+     * 브라우저에서 BrandPay SDK를 초기화할 때 사용하는 공개 가능한 클라이언트 키다.
+     * 시크릿 키와 보안 키는 이 서비스 또는 API 응답에서 절대 반환하지 않는다.
+     */
+    @Value("${moongcheap.payments.brand-pay.client-key:}")
+    private String brandPayClientKey;
 
     public CustomerKey createCustomerKey(Long memberId) {
         for (int attempt = 1; attempt <= KEY_CREATE_MAX_ATTEMPTS; attempt++) {
@@ -40,7 +48,7 @@ public class CustomerKeyService {
     public GetCustomerKeyResponse getCustomerKey(SessionPrincipal principal) {
         CustomerKey customerKey = createCustomerKey(principal.memberId());
 
-        return new GetCustomerKeyResponse(customerKey.getCustomerKey());
+        return new GetCustomerKeyResponse(brandPayClientKey, customerKey.getCustomerKey());
     }
 
     private boolean isCustomerKeyCollision(DataIntegrityViolationException exception) {

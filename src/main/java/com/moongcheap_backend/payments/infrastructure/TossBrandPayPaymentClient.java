@@ -1,12 +1,12 @@
 package com.moongcheap_backend.payments.infrastructure;
 
-import com.moongcheap_backend.common.exception.BusinessException;
-import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.payments.domain.enums.PaymentType;
 import com.moongcheap_backend.payments.infrastructure.BrandPayPaymentClient.AutomaticPaymentRequest;
 import com.moongcheap_backend.payments.infrastructure.BrandPayPaymentClient.AutomaticPaymentResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Optional;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -14,11 +14,14 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
+
+import static com.moongcheap_backend.payments.infrastructure.PaymentGatewayException.Kind.*;
 
 /** 서버 시크릿 키로 토스 브랜드페이 자동결제 API를 호출한다. */
 @Slf4j
 @Component
-public class TossBrandPayPaymentClient implements BrandPayPaymentClient {
+public class TossBrandPayPaymentClient implements BrandPayPaymentClient, PaymentReconciliationClient {
 
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 
@@ -73,23 +76,71 @@ public class TossBrandPayPaymentClient implements BrandPayPaymentClient {
                 || response.paymentKey() == null
                 || response.paymentKey().isBlank()
                 || response.approvedAt() == null) {
-                throw new BusinessException(ErrorCode.BRAND_PAY_AUTO_PAYMENT_FAILED);
+                throw new PaymentGatewayException(INVALID_RESPONSE, "INVALID_PAYMENT_RESPONSE");
             }
             return response;
+        } catch (RestClientResponseException exception) {
+            throw classify(exception, true);
         } catch (RestClientException exception) {
             // 인증 정보, methodKey, 결제 응답 원문은 로그에 기록하지 않는다.
             log.warn("BrandPay automatic payment request failed: orderId={}",
                 request.orderId());
-            throw new BusinessException(ErrorCode.BRAND_PAY_AUTO_PAYMENT_FAILED);
+            throw new PaymentGatewayException(UNKNOWN, "GATEWAY_TRANSPORT_ERROR");
         }
     }
 
+    @Override
+    public Optional<AutomaticPaymentResponse> findByOrderId(String orderId) {
+        if (authorization == null) {
+            throw new PaymentGatewayException(CONFIGURATION, "MISSING_SECRET_KEY");
+        }
+        try {
+            AutomaticPaymentResponse response = restClient.get()
+                .uri("/v1/payments/orders/{orderId}", orderId)
+                .header(HttpHeaders.AUTHORIZATION, authorization)
+                .retrieve().body(AutomaticPaymentResponse.class);
+            if (response == null) {
+                throw new PaymentGatewayException(INVALID_RESPONSE, "EMPTY_LOOKUP_RESPONSE");
+            }
+            return Optional.of(response);
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().value() == 404
+                && "NOT_FOUND_PAYMENT".equals(errorCode(exception))) return Optional.empty();
+            throw classify(exception, false);
+        } catch (RestClientException exception) {
+            throw new PaymentGatewayException(UNKNOWN, "LOOKUP_TRANSPORT_ERROR");
+        }
+    }
+
+    private PaymentGatewayException classify(RestClientResponseException exception,
+        boolean paymentRequest) {
+        String code = errorCode(exception);
+        if (paymentRequest && exception.getStatusCode().is4xxClientError()
+            && Set.of("REJECT_CARD_COMPANY", "REJECT_ACCOUNT_PAYMENT").contains(code)) {
+            return new PaymentGatewayException(DECLINED, code);
+        }
+        if (Set.of("UNAUTHORIZED_KEY", "INCORRECT_BASIC_AUTH_FORMAT").contains(code)) {
+            return new PaymentGatewayException(CONFIGURATION, code);
+        }
+        return new PaymentGatewayException(UNKNOWN, code);
+    }
+
+    private String errorCode(RestClientResponseException exception) {
+        try {
+            GatewayError error = exception.getResponseBodyAs(GatewayError.class);
+            if (error != null && error.code() != null
+                && error.code().matches("[A-Z0-9_]{1,100}")) return error.code();
+        } catch (RuntimeException ignored) {
+            // 응답 원문은 로그에 남기지 않는다.
+        }
+        return "HTTP_" + exception.getStatusCode().value();
+    }
+
+    private record GatewayError(String code) {}
+
     private void validate(AutomaticPaymentRequest request, String idempotencyKey) {
         if (authorization == null) {
-            throw new BusinessException(
-                ErrorCode.BRAND_PAY_AUTO_PAYMENT_FAILED,
-                "브랜드페이 시크릿 키가 설정되지 않았습니다."
-            );
+            throw new PaymentGatewayException(CONFIGURATION, "MISSING_SECRET_KEY");
         }
         if (request == null
             || request.customerKey() == null || request.customerKey().isBlank()
@@ -100,7 +151,7 @@ public class TossBrandPayPaymentClient implements BrandPayPaymentClient {
             || request.orderName() == null || request.orderName().isBlank()
             || request.orderName().length() > 100
             || idempotencyKey == null || idempotencyKey.isBlank()) {
-            throw new BusinessException(ErrorCode.BRAND_PAY_AUTO_PAYMENT_NOT_ALLOWED);
+            throw new PaymentGatewayException(CONFIGURATION, "INVALID_REQUEST_SNAPSHOT");
         }
     }
 

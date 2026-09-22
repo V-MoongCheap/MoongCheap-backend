@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.groupbuy.infrastructure.GroupBuyJudgmentSchedule;
+import com.moongcheap_backend.payments.application.GroupPaymentReservationService;
 import java.time.LocalDateTime;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +34,9 @@ class GroupBuyJudgmentSchedulerUnitTest {
     @Mock
     private GroupBuyJudgmentService judgmentService;
 
+    @Mock
+    private GroupPaymentReservationService paymentReservationService;
+
     @InjectMocks
     private GroupBuyJudgmentScheduler scheduler;
 
@@ -41,10 +45,24 @@ class GroupBuyJudgmentSchedulerUnitTest {
     void 판정에_성공한_공동구매는_Sorted_Set에서_제거한다() {
         when(judgmentSchedule.findDue(any(LocalDateTime.class), eq(100)))
             .thenReturn(Set.of("1"));
+        when(judgmentService.judgeAndPay(1L)).thenReturn(true);
 
         scheduler.judgeDueGroupBuys();
 
         verify(judgmentService).judgeAndPay(1L);
+        verify(paymentReservationService).scheduleForGroup(1L);
+        verify(judgmentSchedule).remove(1L);
+    }
+
+    @Test
+    void 모집실패_판정은_결제를_예약하지_않는다() {
+        when(judgmentSchedule.findDue(any(LocalDateTime.class), eq(100)))
+            .thenReturn(Set.of("1"));
+        when(judgmentService.judgeAndPay(1L)).thenReturn(false);
+
+        scheduler.judgeDueGroupBuys();
+
+        verifyNoInteractions(paymentReservationService);
         verify(judgmentSchedule).remove(1L);
     }
 

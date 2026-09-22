@@ -1,109 +1,67 @@
 package com.moongcheap_backend.payments.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import com.moongcheap_backend.groupbuy.domain.GroupBuy;
+import static org.mockito.Mockito.*;
+import com.moongcheap_backend.common.outbox.domain.OutboxEvent;
+import com.moongcheap_backend.common.outbox.infrastructure.OutboxEventRepository;
+import com.moongcheap_backend.groupbuy.domain.*;
+import com.moongcheap_backend.member.domain.Member;
 import com.moongcheap_backend.order.domain.Orders;
 import com.moongcheap_backend.order.infrastructure.OrdersRepository;
-import com.moongcheap_backend.payments.application.PaymentPreparationService.Preparation;
-import com.moongcheap_backend.payments.domain.Payments;
-import com.moongcheap_backend.payments.domain.enums.PaymentsMethod;
-import com.moongcheap_backend.payments.domain.enums.PaymentsStatus;
-import com.moongcheap_backend.payments.infrastructure.PaymentsRepository;
+import com.moongcheap_backend.payments.domain.*;
+import com.moongcheap_backend.payments.domain.enums.*;
+import com.moongcheap_backend.payments.infrastructure.*;
+import java.time.LocalDateTime;
 import java.util.Optional;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.junit.jupiter.api.*;
 import org.springframework.test.util.ReflectionTestUtils;
 
-@ExtendWith(MockitoExtension.class)
 class PaymentPreparationServiceUnitTest {
+    OrdersRepository orders = mock(OrdersRepository.class);
+    PaymentsRepository payments = mock(PaymentsRepository.class);
+    CustomerKeyRepository customers = mock(CustomerKeyRepository.class);
+    OutboxEventRepository outbox = mock(OutboxEventRepository.class);
+    BrandPayIdempotencyKeyGenerator keys = mock(BrandPayIdempotencyKeyGenerator.class);
+    PaymentPreparationService service = new PaymentPreparationService(
+        orders, payments, customers, outbox, keys);
 
-    @Mock
-    private OrdersRepository ordersRepository;
-
-    @Mock
-    private PaymentsRepository paymentsRepository;
-
-    @InjectMocks
-    private PaymentPreparationService service;
-
-    private Orders order;
-
-    @BeforeEach
-    void setUp() {
-        order = Orders.create(
-            "ORD-automatic-1",
-            10L,
-            1L,
-            null,
-            org.mockito.Mockito.mock(GroupBuy.class),
-            20L,
-            "공동구매 상품",
-            "image.jpg",
-            2,
-            10_000,
-            3_000,
-            30L,
-            "문치프 상점"
-        );
+    @Test void 결제와_Outbox를_같은_예약에서_생성한다() {
+        Member member = Member.builder().loginId("user").nickname("user").build();
+        ReflectionTestUtils.setField(member, "id", 1L);
+        BrandPayMethod method = new BrandPayMethod(member, "method", ProviderCode.CARD_KB,
+            "1234", PaymentType.CARD, true);
+        GroupBuy group = new GroupBuy(null, null, "상품", 1, 1,
+            LocalDateTime.now(), GroupBuyStatus.RECRUITMENT_COMPLETED);
+        Orders order = Orders.create("order-100", 10L, 1L, method, group,
+            1L, "상품", "img", 2, 10000, 0, 1L, "판매자");
         ReflectionTestUtils.setField(order, "id", 100L);
-        when(ordersRepository.findByIdForPaymentUpdate(100L))
-            .thenReturn(Optional.of(order));
+        when(orders.findByIdForPaymentUpdate(100L)).thenReturn(Optional.of(order));
+        when(payments.findFirstByOrdersIdOrderByIdDesc(100L)).thenReturn(Optional.empty());
+        when(customers.findById(1L)).thenReturn(Optional.of(new CustomerKey(member, "customer")));
+        when(keys.forAutomaticPayment("order-100")).thenReturn("fixed-key");
+        when(payments.saveAndFlush(any())).thenAnswer(inv -> {
+            Payments p = inv.getArgument(0);
+            ReflectionTestUtils.setField(p, "id", 200L);
+            return p;
+        });
+
+        assertThat(service.schedule(100L)).isEqualTo(200L);
+
+        var payment = org.mockito.ArgumentCaptor.forClass(Payments.class);
+        verify(payments).saveAndFlush(payment.capture());
+        assertThat(payment.getValue().getStatus()).isEqualTo(PaymentsStatus.PENDING);
+        assertThat(payment.getValue().getIdempotencyKey()).isEqualTo("fixed-key");
+        verify(outbox).save(argThat(event -> event.getAggregateId().equals(200L)
+            && event.getEventType() == com.moongcheap_backend.common.outbox.domain.OutboxEventType.PAYMENT_SCHEDULE_SYNC));
     }
 
-    @Test
-    void 토스_호출_전에_READY_결제_이력을_생성한다() {
-        when(paymentsRepository.findFirstByOrdersIdAndStatusInOrderByIdDesc(
-            eq(100L), anyCollection()
-        )).thenReturn(Optional.empty());
-        when(paymentsRepository.saveAndFlush(any(Payments.class)))
-            .thenAnswer(invocation -> {
-                Payments payment = invocation.getArgument(0);
-                ReflectionTestUtils.setField(payment, "id", 200L);
-                return payment;
-            });
-
-        Preparation result = service.prepare(100L, PaymentsMethod.CARD);
-
-        assertThat(result).isEqualTo(new Preparation(200L, true));
-        ArgumentCaptor<Payments> captor = ArgumentCaptor.forClass(Payments.class);
-        verify(paymentsRepository).saveAndFlush(captor.capture());
-        Payments saved = captor.getValue();
-        assertThat(saved.getStatus()).isEqualTo(PaymentsStatus.READY);
-        assertThat(saved.getPaymentKey()).isNull();
-        assertThat(saved.getOrderNo()).isEqualTo("ORD-automatic-1");
-        assertThat(saved.getTotalAmount()).isEqualTo(20_000);
-        assertThat(saved.getMethod()).isEqualTo(PaymentsMethod.CARD);
-    }
-
-    @Test
-    void 재시도는_기존_READY_결제_이력을_재사용한다() {
-        Payments payment = Payments.readyBrandPay(
-            order,
-            "ORD-automatic-1",
-            "공동구매 상품",
-            20_000,
-            PaymentsMethod.CARD
-        );
-        ReflectionTestUtils.setField(payment, "id", 200L);
-        when(paymentsRepository.findFirstByOrdersIdAndStatusInOrderByIdDesc(
-            eq(100L), anyCollection()
-        )).thenReturn(Optional.of(payment));
-
-        Preparation result = service.prepare(100L, PaymentsMethod.CARD);
-
-        assertThat(result).isEqualTo(new Preparation(200L, true));
-        verify(paymentsRepository, never()).saveAndFlush(any());
+    @Test void 기존_결제는_새_결제로_대체하지_않는다() {
+        Payments previous = mock(Payments.class);
+        when(previous.getId()).thenReturn(200L);
+        when(orders.findByIdForPaymentUpdate(100L)).thenReturn(Optional.of(mock(Orders.class)));
+        when(payments.findFirstByOrdersIdOrderByIdDesc(100L)).thenReturn(Optional.of(previous));
+        assertThat(service.schedule(100L)).isEqualTo(200L);
+        verify(payments, never()).saveAndFlush(any());
+        verifyNoInteractions(outbox);
     }
 }

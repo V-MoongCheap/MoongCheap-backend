@@ -15,6 +15,31 @@ import org.springframework.data.repository.query.Param;
 
 public interface OrdersRepository extends JpaRepository<Orders, Long> {
 
+    @Query(value = """
+        select o.id from orders o join group_buy g on g.id = o.group_buy_id
+        where g.status = 'RECRUITMENT_COMPLETED' and o.order_status = 'PAYMENT_PENDING'
+          and o.id > :afterId
+          and not exists (select 1 from payments p where p.order_id = o.id)
+        order by o.id limit :batchSize
+        """, nativeQuery = true)
+    List<Long> findUnscheduledPaymentOrderIds(@Param("afterId") long afterId,
+        @Param("batchSize") int batchSize);
+
+    @Query(value = """
+        select o.id from orders o join group_buy g on g.id = o.group_buy_id
+        where o.group_buy_id = :groupBuyId
+          and g.status = 'RECRUITMENT_COMPLETED'
+          and o.order_status = 'PAYMENT_PENDING'
+          and o.id > :afterId
+          and not exists (select 1 from payments p where p.order_id = o.id)
+        order by o.id limit :batchSize
+        """, nativeQuery = true)
+    List<Long> findUnscheduledPaymentOrderIdsByGroupBuy(
+        @Param("groupBuyId") Long groupBuyId,
+        @Param("afterId") long afterId,
+        @Param("batchSize") int batchSize
+    );
+
     @Query("select o.demandId from Orders o where o.demandId in :demandIds")
     List<Long> findExistingDemandIds(@Param("demandIds") Collection<Long> demandIds);
 

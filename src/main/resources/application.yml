@@ -82,11 +82,27 @@ resilience4j:
 
 moongcheap:
   payments:
+    queue:
+      enabled: ${PAYMENT_QUEUE_ENABLED:false}
+      workers: 1
+      poll-delay-ms: 1000
+      visibility-delay: 60s
+      lease: 60s
+      outbox-publish-delay-ms: 1000
+      recovery-delay-ms: 5000
+      batch-size: 100
+      max-attempts: 5
+      replay-window: 14d
+      shutdown-wait: 15s
     brand-pay:
       # 브랜드페이 서버 API의 기본 주소
       base-url: "https://api.tosspayments.com"
+      # 브라우저에서 브랜드페이 SDK를 초기화할 때 사용하는 공개 키
+      client-key: "${TOSS_BRANDPAY_CLIENT_KEY:}"
       # 토큰 발급에 사용하는 서버 전용 시크릿 키. 저장소에 실제 값을 커밋하지 않는다.
       secret-key: "${TOSS_BRANDPAY_SECRET_KEY:}"
+      # 웹훅 서명 검증 등에 사용하는 서버 전용 보안 키. 클라이언트에 노출하지 않는다.
+      security-key: "${TOSS_BRANDPAY_SECURITY_KEY:}"
   batch:
     demand-expire:
       cron: "0 5 * * * *"

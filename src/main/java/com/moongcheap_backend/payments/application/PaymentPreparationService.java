@@ -1,79 +1,75 @@
 package com.moongcheap_backend.payments.application;
 
+import com.moongcheap_backend.common.outbox.domain.OutboxEvent;
+import com.moongcheap_backend.common.outbox.infrastructure.OutboxEventRepository;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
+import com.moongcheap_backend.groupbuy.domain.GroupBuyStatus;
 import com.moongcheap_backend.order.domain.OrderStatus;
 import com.moongcheap_backend.order.domain.Orders;
 import com.moongcheap_backend.order.infrastructure.OrdersRepository;
+import com.moongcheap_backend.payments.domain.BrandPayMethod;
 import com.moongcheap_backend.payments.domain.Payments;
+import com.moongcheap_backend.payments.domain.enums.PaymentType;
 import com.moongcheap_backend.payments.domain.enums.PaymentsMethod;
-import com.moongcheap_backend.payments.domain.enums.PaymentsStatus;
+import com.moongcheap_backend.payments.domain.enums.PaymentsMethodStatus;
+import com.moongcheap_backend.payments.infrastructure.CustomerKeyRepository;
 import com.moongcheap_backend.payments.infrastructure.PaymentsRepository;
-import java.util.Set;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 토스 요청 전에 READY 결제 이력을 만들거나 기존 진행 이력을 재사용한다. */
+/** 결제와 Redis 전달용 Outbox만 저장하며 외부 시스템은 호출하지 않는다. */
 @Service
 @RequiredArgsConstructor
 public class PaymentPreparationService {
-
-    private static final Set<PaymentsStatus> REUSABLE_STATUSES = Set.of(
-        PaymentsStatus.READY,
-        PaymentsStatus.DONE
-    );
+    private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
 
     private final OrdersRepository ordersRepository;
     private final PaymentsRepository paymentsRepository;
+    private final CustomerKeyRepository customerKeyRepository;
+    private final OutboxEventRepository outboxRepository;
+    private final BrandPayIdempotencyKeyGenerator idempotencyKeyGenerator;
 
-    @Transactional
-    public Preparation prepare(Long orderId, PaymentsMethod method) {
-        // 같은 주문의 동시 준비 요청을 직렬화해 READY 레코드가 중복 생성되지 않게 한다.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Long schedule(Long orderId) {
+        paymentsRepository.configureLockTimeout();
         Orders order = ordersRepository.findByIdForPaymentUpdate(orderId)
             .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+        var previous = paymentsRepository.findFirstByOrdersIdOrderByIdDesc(orderId);
+        if (previous.isPresent()) return previous.get().getId();
 
-        if (order.getOrderStatus() == OrderStatus.PAYMENT_COMPLETED) {
-            return Preparation.completed();
-        }
-        if (order.getOrderStatus() != OrderStatus.PAYMENT_PENDING) {
-            throw new BusinessException(ErrorCode.BRAND_PAY_AUTO_PAYMENT_NOT_ALLOWED);
-        }
+        BrandPayMethod method = order.getBrandPayMethod();
+        var customer = customerKeyRepository.findById(order.getMemberId());
+        boolean valid = order.getOrderStatus() == OrderStatus.PAYMENT_PENDING
+            && order.getGroupBuy().getStatus() == GroupBuyStatus.RECRUITMENT_COMPLETED
+            && method != null && method.getStatus() == PaymentsMethodStatus.ACTIVE
+            && method.getMember().getId().equals(order.getMemberId())
+            && method.getMember().isActive()
+            && customer.isPresent() && customer.get().getCustomerKey() != null
+            && !customer.get().getCustomerKey().isBlank()
+            && order.getTotalAmount() != null && order.getTotalAmount() > 0
+            && order.getProductName() != null && !order.getProductName().isBlank()
+            && order.getProductName().length() <= 100;
 
-        return paymentsRepository
-            .findFirstByOrdersIdAndStatusInOrderByIdDesc(orderId, REUSABLE_STATUSES)
-            .map(payment -> reuse(order, payment))
-            .orElseGet(() -> create(order, method));
-    }
-
-    private Preparation reuse(Orders order, Payments payment) {
-        if (payment.getStatus() == PaymentsStatus.DONE) {
-            // 결제 저장 후 주문 상태만 유실된 과거 불일치도 이 시점에 복구한다.
-            order.setOrderStatus(OrderStatus.PAYMENT_COMPLETED);
-            return Preparation.completed();
-        }
-        return Preparation.requestRequired(payment.getId());
-    }
-
-    private Preparation create(Orders order, PaymentsMethod method) {
-        Payments payment = paymentsRepository.saveAndFlush(Payments.readyBrandPay(
-            order,
-            order.getOrderNo(),
-            order.getProductName(),
-            order.getTotalAmount(),
-            method
-        ));
-        return Preparation.requestRequired(payment.getId());
-    }
-
-    public record Preparation(Long paymentId, boolean requestRequired) {
-
-        private static Preparation completed() {
-            return new Preparation(null, false);
+        Payments payment = Payments.readyBrandPay(order, order.getOrderNo(),
+            order.getProductName(), order.getTotalAmount(),
+            method != null && method.getType() == PaymentType.CARD
+                ? PaymentsMethod.CARD : PaymentsMethod.TRANSFER);
+        if (valid) {
+            payment.schedule(method, customer.get().getCustomerKey(),
+                idempotencyKeyGenerator.forAutomaticPayment(order.getOrderNo()));
+        } else {
+            payment.fail();
+            order.setOrderStatus(OrderStatus.PAYMENT_FAILED);
         }
 
-        private static Preparation requestRequired(Long paymentId) {
-            return new Preparation(paymentId, true);
-        }
+        paymentsRepository.saveAndFlush(payment);
+        LocalDateTime now = LocalDateTime.now(ZONE_SEOUL);
+        outboxRepository.save(OutboxEvent.paymentScheduleSync(payment.getId(), now, now));
+        return payment.getId();
     }
 }

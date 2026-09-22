@@ -38,7 +38,7 @@ public class OutboxEvent extends BaseTimeEntity {
     @Column(name = "event_type", nullable = false, length = 50)
     private OutboxEventType eventType;
 
-    //현재 groupBuyId
+    // 이벤트 종류에 따른 aggregate ID(groupBuyId 또는 paymentId)
     @Column(name = "aggregate_id", nullable = false)
     private Long aggregateId;
 
@@ -99,6 +99,31 @@ public class OutboxEvent extends BaseTimeEntity {
             now,
             now
         );
+    }
+
+    public static OutboxEvent paymentScheduleSync(
+        Long paymentId,
+        LocalDateTime scheduledAt,
+        LocalDateTime now
+    ) {
+        return new OutboxEvent(
+            OutboxEventType.PAYMENT_SCHEDULE_SYNC,
+            paymentId,
+            scheduledAt,
+            now
+        );
+    }
+
+    /** 최신 결제 예약 또는 삭제 의도를 Redis에 다시 반영하도록 만든다. */
+    public void requestPaymentSync(LocalDateTime scheduledAt, LocalDateTime now) {
+        if (eventType != OutboxEventType.PAYMENT_SCHEDULE_SYNC) {
+            throw new IllegalStateException("결제 Outbox만 재예약할 수 있습니다.");
+        }
+        this.scheduledAt = scheduledAt;
+        this.status = OutboxEventStatus.PENDING;
+        this.retryCount = 0;
+        this.nextAttemptAt = now;
+        this.publishedAt = null;
     }
 
     public void markPublished(LocalDateTime now) {

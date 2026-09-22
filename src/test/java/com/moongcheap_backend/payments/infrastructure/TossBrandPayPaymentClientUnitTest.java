@@ -6,6 +6,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
 import com.moongcheap_backend.payments.domain.enums.PaymentType;
 import com.moongcheap_backend.payments.infrastructure.BrandPayPaymentClient.AutomaticPaymentRequest;
@@ -14,11 +15,41 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 class TossBrandPayPaymentClientUnitTest {
+
+    @Test
+    void 명시적인_NOT_FOUND_PAYMENT만_미조회로_처리한다() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        TossBrandPayPaymentClient client = new TossBrandPayPaymentClient(
+            builder.build(), "https://api.tosspayments.com", "test-secret");
+        server.expect(requestTo("https://api.tosspayments.com/v1/payments/orders/order-1"))
+            .andExpect(method(HttpMethod.GET))
+            .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
+                .body("{\"code\":\"NOT_FOUND_PAYMENT\"}"));
+        assertThat(client.findByOrderId("order-1")).isEmpty();
+    }
+
+    @Test
+    void 승인거절만_확정실패로_분류한다() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        TossBrandPayPaymentClient client = new TossBrandPayPaymentClient(
+            builder.build(), "https://api.tosspayments.com", "test-secret");
+        server.expect(requestTo("https://api.tosspayments.com/v1/brandpay/payments"))
+            .andRespond(withStatus(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                .body("{\"code\":\"REJECT_CARD_COMPANY\"}"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> client.pay(
+            new AutomaticPaymentRequest("customer", "method", PaymentType.CARD,
+                1000, "order-1", "상품"), "key"))
+            .isInstanceOfSatisfying(PaymentGatewayException.class,
+                error -> assertThat(error.kind()).isEqualTo(PaymentGatewayException.Kind.DECLINED));
+    }
 
     @Test
     void 카드_자동결제를_Basic_인증과_멱등키로_실행한다() {
