@@ -31,7 +31,8 @@ public record AwardingPendingResponseDto(
         LocalDateTime calculationStartedAt,
         int participantCount,
         Long totalQuantity,
-        List<Product> products
+        List<Product> products,
+        int maxDemandQuantityPerMember
     ) {
 
     }
@@ -40,7 +41,11 @@ public record AwardingPendingResponseDto(
         Long productId,
         Long sellerId,
         Integer price,
-        Integer quantity
+        Integer quantity,
+        Integer shippingFee,
+        Integer minQuantity,
+        Integer minParticipantCount,
+        Integer maxQuantityPerMember
     ) {
 
     }

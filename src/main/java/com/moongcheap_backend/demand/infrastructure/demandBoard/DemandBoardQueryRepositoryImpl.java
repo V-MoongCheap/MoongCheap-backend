@@ -234,13 +234,16 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
             db.sale_end_at    AS sale_end_at,
             db.updated_at     AS calculation_started_at,
             db.participant_count AS participant_count,
-            COALESCE((
-                SELECT SUM(d.quantity)
-                FROM demand d
-                WHERE d.demand_board_id = db.id
-                  AND d.status = 'ASSIGNED'
-            ), 0)             AS total_quantity
+            COALESCE(agg.total_quantity, 0) AS total_quantity,
+            COALESCE(agg.max_demand_quantity_per_member, 0) AS max_demand_quantity_per_member
         FROM demand_board db
+        LEFT JOIN LATERAL (
+            SELECT SUM(d.quantity) AS total_quantity,
+                   MAX(d.quantity) AS max_demand_quantity_per_member
+            FROM demand d
+            WHERE d.demand_board_id = db.id
+              AND d.status = 'ASSIGNED'
+        ) agg ON TRUE
         WHERE db.status = 'GB_AWARDING'
         ORDER BY db.updated_at ASC, db.id ASC
         LIMIT :limit
@@ -248,11 +251,15 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
 
     private static final String PENDING_AWARDING_PRODUCTS_QUERY = """
         SELECT
-            p.id              AS product_id,
-            p.demand_board_id AS board_id,
-            p.seller_id       AS seller_id,
-            p.unit_price      AS price,
-            p.total_quantity  AS quantity
+            p.id                      AS product_id,
+            p.demand_board_id         AS board_id,
+            p.seller_id               AS seller_id,
+            p.unit_price              AS price,
+            p.total_quantity          AS quantity,
+            p.shipping_fee            AS shipping_fee,
+            p.min_quantity            AS min_quantity,
+            p.min_participant_count   AS min_participant_count,
+            p.max_quantity_per_member AS max_quantity_per_member
         FROM product p
         WHERE p.demand_board_id IN (:boardIds)
           AND p.status = 'AWARDING'
@@ -272,7 +279,8 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
                 JdbcTimeMapper.toLocalDateTime(rs, "sale_end_at"),
                 JdbcTimeMapper.toLocalDateTime(rs, "calculation_started_at"),
                 rs.getInt("participant_count"),
-                rs.getLong("total_quantity")
+                rs.getLong("total_quantity"),
+                rs.getInt("max_demand_quantity_per_member")
             )
         );
 
@@ -291,7 +299,11 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
                     rs.getLong("product_id"),
                     rs.getLong("seller_id"),
                     rs.getObject("price", Integer.class),
-                    rs.getObject("quantity", Integer.class)
+                    rs.getObject("quantity", Integer.class),
+                    rs.getObject("shipping_fee", Integer.class),
+                    rs.getObject("min_quantity", Integer.class),
+                    rs.getObject("min_participant_count", Integer.class),
+                    rs.getObject("max_quantity_per_member", Integer.class)
                 );
                 productsByBoard.computeIfAbsent(boardId, k -> new ArrayList<>()).add(product);
                 return null;
@@ -308,7 +320,8 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
                 row.calculationStartedAt(),
                 row.participantCount(),
                 row.totalQuantity(),
-                productsByBoard.getOrDefault(row.boardId(), List.of())
+                productsByBoard.getOrDefault(row.boardId(), List.of()),
+                row.maxDemandQuantityPerMember()
             ))
             .toList();
     }
@@ -321,7 +334,8 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
         LocalDateTime saleEndAt,
         LocalDateTime calculationStartedAt,
         int participantCount,
-        Long totalQuantity
+        Long totalQuantity,
+        int maxDemandQuantityPerMember
     ) {
 
     }
