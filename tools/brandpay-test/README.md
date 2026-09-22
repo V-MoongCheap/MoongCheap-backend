@@ -39,6 +39,10 @@ http://localhost:8080/api/dev/brandpay-test/callback
 6. 백엔드가 Access Token을 발급하고 토스 결제수단을 DB에 동기화한다.
 7. 서버에 저장된 결제수단 목록을 화면에 표시한다.
 
+백엔드 콜백은 처리를 마치면 `204 No Content`를 반환한다. 정적 프론트 서버로 다시
+HTTP 리다이렉트하지 않으므로 `python -m http.server`가 지원하지 않는 `OPTIONS`
+요청으로 이어지지 않고, 기존 화면에서 실행 중인 `addPaymentMethod()`가 계속 진행된다.
+
 `customerToken이 존재하지 않습니다`처럼 이전 인증 실패로 특정 customerKey가 중간
 상태에 걸리면 화면의 `새 테스트 고객으로 시작` 버튼으로 새로운 회원/customerKey를
 발급한 뒤 다시 시도한다.
