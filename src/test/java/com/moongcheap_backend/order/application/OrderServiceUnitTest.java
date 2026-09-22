@@ -16,11 +16,13 @@ import com.moongcheap_backend.member.application.OrderMemberInfoService;
 import com.moongcheap_backend.member.domain.Seller;
 import com.moongcheap_backend.order.domain.OrderStatus;
 import com.moongcheap_backend.order.domain.Orders;
+import com.moongcheap_backend.order.infrastructure.OrderStatusCount;
 import com.moongcheap_backend.order.infrastructure.OrdersRepository;
 import com.moongcheap_backend.order.presentation.OrderController.OrderListTab;
 import com.moongcheap_backend.order.presentation.dto.OrderDetailResponse;
 import com.moongcheap_backend.order.presentation.dto.OrderListResponse;
 import com.moongcheap_backend.order.presentation.dto.OrderShippingAddressRequest;
+import com.moongcheap_backend.order.presentation.dto.OrderSummaryResponse;
 import com.moongcheap_backend.payments.application.PaymentPublicService;
 import com.moongcheap_backend.payments.domain.BrandPayMethod;
 import com.moongcheap_backend.payments.presentation.dto.OrderPaymentInfo;
@@ -603,6 +605,47 @@ class OrderServiceUnitTest {
             assertThat(response.productName()).isEqualTo("제주 감귤");
             assertThat(response.quantity()).isEqualTo(2);
             assertThat(response.totalAmount()).isEqualTo(23_000);
+        }
+    }
+
+    @Nested
+    @DisplayName("주문 진행 요약 조회 정상 테스트")
+    class GetOrderSummaryTest {
+
+        @Test
+        void 상태별_건수를_반환하고_조회되지_않은_상태는_0으로_채운다() {
+            Set<OrderStatus> statuses = Set.of(
+                OrderStatus.PAYMENT_COMPLETED,
+                OrderStatus.PREPARING_SHIPMENT,
+                OrderStatus.SHIPPED,
+                OrderStatus.DELIVERED
+            );
+            when(ordersRepository.countByMemberIdAndOrderStatusIn(MEMBER_ID, statuses))
+                .thenReturn(List.of(
+                    count(OrderStatus.PAYMENT_COMPLETED, 2),
+                    count(OrderStatus.SHIPPED, 3),
+                    count(OrderStatus.DELIVERED, 5)
+                ));
+
+            OrderSummaryResponse response = orderService.getSummary(MEMBER_ID);
+
+            assertThat(response).isEqualTo(new OrderSummaryResponse(2, 0, 3, 5));
+            verify(orderMemberInfoService).validateActiveMember(MEMBER_ID);
+            verify(ordersRepository).countByMemberIdAndOrderStatusIn(MEMBER_ID, statuses);
+        }
+
+        private OrderStatusCount count(OrderStatus status, long count) {
+            return new OrderStatusCount() {
+                @Override
+                public OrderStatus getOrderStatus() {
+                    return status;
+                }
+
+                @Override
+                public long getCount() {
+                    return count;
+                }
+            };
         }
     }
 

@@ -31,6 +31,21 @@ public class BrandPayIdempotencyKeyGenerator {
         return sha256("brandpay-refresh-v1:" + memberId + ":" + encryptedAccessToken);
     }
 
+    /**
+     * 동일한 로컬 결제수단 삭제 재시도가 토스에서 한 번만 처리되도록 한다.
+     * 자동결제용 methodKey 원문은 헤더에 노출하지 않고 해시 입력으로만 사용한다.
+     */
+    public String forPaymentMethodRemoval(Long memberId, Long paymentMethodId,
+        String methodKey) {
+        return sha256("brandpay-method-remove-v1:" + memberId + ":"
+            + paymentMethodId + ":" + methodKey);
+    }
+
+    /** 같은 주문의 자동결제 재시도가 토스에서 중복 승인되지 않게 한다. */
+    public String forAutomaticPayment(String orderNo) {
+        return sha256("brandpay-auto-payment-v1:" + orderNo);
+    }
+
     private String sha256(String source) {
         try {
             byte[] digest = MessageDigest.getInstance(SHA_256)

@@ -5,6 +5,7 @@ import com.moongcheap_backend.order.application.OrderService;
 import com.moongcheap_backend.order.presentation.dto.OrderDetailResponse;
 import com.moongcheap_backend.order.presentation.dto.OrderListResponse;
 import com.moongcheap_backend.order.presentation.dto.OrderShippingAddressRequest;
+import com.moongcheap_backend.order.presentation.dto.OrderSummaryResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -42,6 +43,12 @@ public class OrderController {
         @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
         Pageable pageable) {
         return ResponseEntity.ok(orderService.viewOrderList(principal.memberId(), tab, pageable));
+    }
+
+    @Operation(summary = "마이페이지 주문 진행 요약 조회")
+    @GetMapping("/summary")
+    public ResponseEntity<OrderSummaryResponse> getOrderSummary(SessionPrincipal principal) {
+        return ResponseEntity.ok(orderService.getSummary(principal.memberId()));
     }
 
     //주문상세조회

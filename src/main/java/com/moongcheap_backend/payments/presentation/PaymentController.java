@@ -4,6 +4,7 @@ import com.moongcheap_backend.common.security.SessionPrincipal;
 import com.moongcheap_backend.payments.application.BrandPayTokenService;
 import com.moongcheap_backend.payments.application.CreatePayMethodService;
 import com.moongcheap_backend.payments.application.CustomerKeyService;
+import com.moongcheap_backend.payments.application.PaymentService;
 import com.moongcheap_backend.payments.presentation.dto.BrandPayAuthorizationRequest;
 import com.moongcheap_backend.payments.presentation.dto.GetCustomerKeyResponse;
 import com.moongcheap_backend.payments.presentation.dto.PaymentCancelRequestDto;
@@ -32,6 +33,7 @@ public class PaymentController {
     private final CustomerKeyService customerKeyService;
     private final BrandPayTokenService brandPayTokenService;
     private final CreatePayMethodService createPayMethodService;
+    private final PaymentService paymentService;
 
     /**
      * 브랜드페이 SDK 초기화에 사용할 로그인 회원의 CustomerKey를 반환한다.
@@ -46,8 +48,8 @@ public class PaymentController {
     }
 
     /**
-     * 프론트엔드가 전달한 SDK 인증 결과를 토큰으로 교환한 뒤, 토스에 등록된 결제수단을
-     * 서버 DB에 동기화한다. 성공 시 응답 본문에 민감한 정보를 싣지 않고 204를 반환한다.
+     * 프론트엔드가 전달한 SDK 인증 결과를 토큰으로 교환한 뒤, 토스에 등록된 결제수단을 서버 DB에 동기화한다. 성공 시 응답 본문에 민감한 정보를 싣지 않고 204를
+     * 반환한다.
      */
     @Operation(summary = "브랜드페이 인증 및 결제수단 등록 완료",
         description = "SDK redirectUrl의 code로 토큰을 발급하고 등록 결제수단을 서버에 동기화합니다.")
@@ -66,20 +68,22 @@ public class PaymentController {
     }
 
     @Operation(summary = "결제수단 목록 조회",
-        description = "기능 ID 없음. 로그인한 회원이 등록한 결제수단을 조회합니다.")
+        description = "로그인한 회원의 만료되지 않은 결제수단을 조회합니다.")
     @GetMapping("/methods")
     public ResponseEntity<List<PaymentMethodResponseDto>> list(
         SessionPrincipal principal) {
-        throw new UnsupportedOperationException("PaymentService 구현이 필요합니다.");
+        return ResponseEntity.ok(paymentService
+            .getPaymentMethods(principal.memberId()));
     }
 
     @Operation(summary = "결제수단 삭제",
-        description = "기능 ID 없음. 로그인한 회원이 등록한 결제수단을 삭제합니다.")
+        description = "로그인한 회원의 결제수단을 토스에서 삭제하고 서버에서 만료 처리합니다.")
     @DeleteMapping("/methods/{paymentMethodId}")
     public ResponseEntity<Void> delete(
         SessionPrincipal principal,
         @PathVariable Long paymentMethodId) {
-        throw new UnsupportedOperationException("PaymentService 구현이 필요합니다.");
+        paymentService.deletePaymentMethod(principal.memberId(), paymentMethodId);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "결제 취소",

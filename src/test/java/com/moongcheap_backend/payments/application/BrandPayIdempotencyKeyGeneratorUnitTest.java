@@ -36,4 +36,28 @@ class BrandPayIdempotencyKeyGeneratorUnitTest {
 
         assertThat(issueKey).isNotEqualTo(refreshKey);
     }
+
+    @Test
+    void 같은_결제수단_삭제는_같은_멱등키를_생성한다() {
+        String first = generator.forPaymentMethodRemoval(1L, 10L, "method-key");
+        String second = generator.forPaymentMethodRemoval(1L, 10L, "method-key");
+
+        assertThat(first)
+            .isEqualTo(second)
+            .matches("[0-9a-f]{64}");
+        assertThat(generator.forPaymentMethodRemoval(1L, 11L, "method-key"))
+            .isNotEqualTo(first);
+    }
+
+    @Test
+    void 같은_주문번호는_같은_자동결제_멱등키를_생성한다() {
+        String first = generator.forAutomaticPayment("ORD-automatic-1");
+        String second = generator.forAutomaticPayment("ORD-automatic-1");
+
+        assertThat(first)
+            .isEqualTo(second)
+            .matches("[0-9a-f]{64}");
+        assertThat(generator.forAutomaticPayment("ORD-automatic-2"))
+            .isNotEqualTo(first);
+    }
 }

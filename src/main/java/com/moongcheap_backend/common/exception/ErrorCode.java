@@ -99,6 +99,9 @@ public enum ErrorCode {
     BRAND_PAY_ACCESS_TOKEN_UNAVAILABLE(HttpStatus.INTERNAL_SERVER_ERROR, "PAY_009", "브랜드페이 Access Token을 사용할 수 없습니다."),
     BRAND_PAY_METHOD_LOOKUP_FAILED(HttpStatus.BAD_GATEWAY, "PAY_010", "브랜드페이 결제수단 조회에 실패했습니다."),
     BRAND_PAY_METHOD_SYNC_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PAY_011", "브랜드페이 결제수단 동기화에 실패했습니다."),
+    BRAND_PAY_METHOD_REMOVE_FAILED(HttpStatus.BAD_GATEWAY, "PAY_012", "브랜드페이 결제수단 삭제에 실패했습니다."),
+    BRAND_PAY_AUTO_PAYMENT_NOT_ALLOWED(HttpStatus.CONFLICT, "PAY_013", "자동결제를 실행할 수 없는 주문입니다."),
+    BRAND_PAY_AUTO_PAYMENT_FAILED(HttpStatus.BAD_GATEWAY, "PAY_014", "브랜드페이 자동결제에 실패했습니다."),
 
     // Search
     SEARCH_INDEX_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SEARCH_001", "상품 검색 인덱싱에 실패했습니다.");

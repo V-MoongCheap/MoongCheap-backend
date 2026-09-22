@@ -40,4 +40,30 @@ public interface OrdersRepository extends JpaRepository<Orders, Long> {
     );
 
     boolean existsByMemberIdAndOrderStatusIn(Long memberId, Collection<OrderStatus> statuses);
+
+    @Query("""
+        select o.orderStatus as orderStatus, count(o) as count
+        from Orders o
+        where o.memberId = :memberId
+          and o.orderStatus in :statuses
+        group by o.orderStatus
+        """)
+    List<OrderStatusCount> countByMemberIdAndOrderStatusIn(
+        @Param("memberId") Long memberId,
+        @Param("statuses") Collection<OrderStatus> statuses
+    );
+
+    /** 자동결제 요청에 필요한 주문과 저장된 결제수단을 함께 조회한다. */
+    @Query("""
+        select o
+        from Orders o
+        left join fetch o.brandPayMethod
+        where o.id = :orderId
+        """)
+    Optional<Orders> findByIdForAutomaticPayment(@Param("orderId") Long orderId);
+
+    /** 승인 결과 저장 시 같은 주문의 중복 완료를 막기 위한 배타 잠금 조회다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Orders o where o.id = :orderId")
+    Optional<Orders> findByIdForPaymentUpdate(@Param("orderId") Long orderId);
 }
