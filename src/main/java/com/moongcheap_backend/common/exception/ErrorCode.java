@@ -102,6 +102,9 @@ public enum ErrorCode {
     BRAND_PAY_METHOD_REMOVE_FAILED(HttpStatus.BAD_GATEWAY, "PAY_012", "브랜드페이 결제수단 삭제에 실패했습니다."),
     BRAND_PAY_AUTO_PAYMENT_NOT_ALLOWED(HttpStatus.CONFLICT, "PAY_013", "자동결제를 실행할 수 없는 주문입니다."),
     BRAND_PAY_AUTO_PAYMENT_FAILED(HttpStatus.BAD_GATEWAY, "PAY_014", "브랜드페이 자동결제에 실패했습니다."),
+    PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAY_015", "결제를 찾을 수 없습니다."),
+    PAYMENT_CANNOT_CANCEL(HttpStatus.CONFLICT, "PAY_016", "현재 상태에서는 결제를 취소할 수 없습니다."),
+    PAYMENT_CANCEL_FAILED(HttpStatus.BAD_GATEWAY, "PAY_017", "결제 취소에 실패했습니다."),
 
     // Search
     SEARCH_INDEX_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SEARCH_001", "상품 검색 인덱싱에 실패했습니다.");

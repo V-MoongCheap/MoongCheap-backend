@@ -3,8 +3,11 @@ package com.moongcheap_backend.payments.infrastructure;
 import com.moongcheap_backend.payments.domain.enums.PaymentType;
 import com.moongcheap_backend.payments.infrastructure.BrandPayPaymentClient.AutomaticPaymentRequest;
 import com.moongcheap_backend.payments.infrastructure.BrandPayPaymentClient.AutomaticPaymentResponse;
+import com.moongcheap_backend.payments.infrastructure.PaymentCancellationClient.CancellationResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +24,8 @@ import static com.moongcheap_backend.payments.infrastructure.PaymentGatewayExcep
 /** 서버 시크릿 키로 토스 브랜드페이 자동결제 API를 호출한다. */
 @Slf4j
 @Component
-public class TossBrandPayPaymentClient implements BrandPayPaymentClient, PaymentReconciliationClient {
+public class TossBrandPayPaymentClient implements BrandPayPaymentClient,
+    PaymentReconciliationClient, PaymentCancellationClient {
 
     private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 
@@ -112,11 +116,73 @@ public class TossBrandPayPaymentClient implements BrandPayPaymentClient, Payment
         }
     }
 
+    /**
+     * 코어 결제 취소 API로 전액 취소한다. cancelAmount를 보내지 않으면 토스가 전액
+     * 취소로 처리한다. 호출자가 만든 멱등키를 그대로 전달해 네트워크 재시도 시의
+     * 중복 취소를 방지한다.
+     */
+    @Override
+    public CancellationResponse cancel(String paymentKey, String cancelReason,
+        String idempotencyKey) {
+        validateCancellation(paymentKey, cancelReason, idempotencyKey);
+
+        try {
+            TossCancellationResponse response = restClient.post()
+                .uri("/v1/payments/{paymentKey}/cancel", paymentKey)
+                .header(HttpHeaders.AUTHORIZATION, authorization)
+                .header(IDEMPOTENCY_KEY_HEADER, idempotencyKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new CancellationRequest(cancelReason))
+                .retrieve()
+                .body(TossCancellationResponse.class);
+
+            CancelDetail completed = response == null || response.cancels() == null
+                ? null
+                : response.cancels().stream()
+                    .filter(cancel -> "DONE".equals(cancel.cancelStatus()))
+                    .filter(cancel -> cancel.canceledAt() != null)
+                    .max(java.util.Comparator.comparing(CancelDetail::canceledAt))
+                    .orElse(null);
+
+            if (response == null
+                || response.paymentKey() == null || response.paymentKey().isBlank()
+                || response.orderId() == null || response.orderId().isBlank()
+                || !"CANCELED".equals(response.status())
+                || completed == null || completed.canceledAt() == null
+                || completed.cancelReason() == null || completed.cancelReason().isBlank()) {
+                throw new PaymentGatewayException(INVALID_RESPONSE,
+                    "INVALID_CANCELLATION_RESPONSE");
+            }
+
+            return new CancellationResponse(response.paymentKey(), response.orderId(),
+                response.status(), completed.canceledAt(), completed.cancelReason());
+        } catch (RestClientResponseException exception) {
+            throw classifyCancellation(exception);
+        } catch (RestClientException exception) {
+            log.warn("Payment cancellation request failed");
+            throw new PaymentGatewayException(UNKNOWN,
+                "CANCELLATION_TRANSPORT_ERROR");
+        }
+    }
+
     private PaymentGatewayException classify(RestClientResponseException exception,
         boolean paymentRequest) {
         String code = errorCode(exception);
         if (paymentRequest && exception.getStatusCode().is4xxClientError()
             && Set.of("REJECT_CARD_COMPANY", "REJECT_ACCOUNT_PAYMENT").contains(code)) {
+            return new PaymentGatewayException(DECLINED, code);
+        }
+        if (Set.of("UNAUTHORIZED_KEY", "INCORRECT_BASIC_AUTH_FORMAT").contains(code)) {
+            return new PaymentGatewayException(CONFIGURATION, code);
+        }
+        return new PaymentGatewayException(UNKNOWN, code);
+    }
+
+    private PaymentGatewayException classifyCancellation(
+        RestClientResponseException exception) {
+        String code = errorCode(exception);
+        if (Set.of("NOT_CANCELABLE_PAYMENT", "ALREADY_CANCELED_PAYMENT")
+            .contains(code)) {
             return new PaymentGatewayException(DECLINED, code);
         }
         if (Set.of("UNAUTHORIZED_KEY", "INCORRECT_BASIC_AUTH_FORMAT").contains(code)) {
@@ -155,6 +221,20 @@ public class TossBrandPayPaymentClient implements BrandPayPaymentClient, Payment
         }
     }
 
+    private void validateCancellation(String paymentKey, String cancelReason,
+        String idempotencyKey) {
+        if (authorization == null) {
+            throw new PaymentGatewayException(CONFIGURATION, "MISSING_SECRET_KEY");
+        }
+        if (paymentKey == null || paymentKey.isBlank() || paymentKey.length() > 200
+            || cancelReason == null || cancelReason.isBlank() || cancelReason.length() > 200
+            || idempotencyKey == null || idempotencyKey.isBlank()
+            || idempotencyKey.length() > 300) {
+            throw new PaymentGatewayException(CONFIGURATION,
+                "INVALID_CANCELLATION_REQUEST");
+        }
+    }
+
     private String createBasicAuthorization(String secretKey) {
         if (secretKey == null || secretKey.isBlank()) {
             return null;
@@ -185,6 +265,24 @@ public class TossBrandPayPaymentClient implements BrandPayPaymentClient, Payment
         String orderName,
         boolean cultureExpense,
         int taxFreeAmount
+    ) {
+    }
+
+    private record CancellationRequest(String cancelReason) {
+    }
+
+    private record TossCancellationResponse(
+        String paymentKey,
+        String orderId,
+        String status,
+        List<CancelDetail> cancels
+    ) {
+    }
+
+    private record CancelDetail(
+        String cancelReason,
+        OffsetDateTime canceledAt,
+        String cancelStatus
     ) {
     }
 }

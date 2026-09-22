@@ -67,6 +67,21 @@ public class PaymentController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * 이미 인증된 사용자가 SDK에서 결제수단만 추가한 경우 토스의 최신 목록을 다시
+     * 읽어 서버 DB에 반영한다. 최초 인증 콜백은 위 authorization API가 발급과
+     * 동기화를 한 번에 처리하므로 이 API를 추가 호출할 필요가 없다.
+     */
+    @Operation(summary = "브랜드페이 결제수단 재동기화",
+        description = "저장된 Access Token으로 토스의 최신 결제수단을 서버 DB에 동기화합니다.")
+    @PostMapping("/brandpay/methods/synchronize")
+    public ResponseEntity<Void> synchronizeBrandPayMethods(
+        SessionPrincipal principal
+    ) {
+        createPayMethodService.synchronize(principal.memberId());
+        return ResponseEntity.noContent().build();
+    }
+
     @Operation(summary = "결제수단 목록 조회",
         description = "로그인한 회원의 만료되지 않은 결제수단을 조회합니다.")
     @GetMapping("/methods")
@@ -87,13 +102,15 @@ public class PaymentController {
     }
 
     @Operation(summary = "결제 취소",
-        description = "기능 ID 없음. 로그인한 회원의 결제를 취소합니다.")
+        description = "로그인한 회원의 승인 완료 결제를 토스페이먼츠에서 전액 취소합니다.")
     @PatchMapping("/{paymentId}")
     public ResponseEntity<Void> cancel(
         SessionPrincipal principal,
         @PathVariable Long paymentId,
         @RequestBody @Valid PaymentCancelRequestDto request) {
-        throw new UnsupportedOperationException("PaymentService 구현이 필요합니다.");
+        paymentService.cancelPayment(
+            principal.memberId(), paymentId, request.cancelReason());
+        return ResponseEntity.noContent().build();
     }
 
     //기본결제수단 변경

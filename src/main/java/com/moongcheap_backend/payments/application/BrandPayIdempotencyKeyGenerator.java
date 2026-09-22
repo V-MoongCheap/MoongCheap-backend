@@ -46,6 +46,11 @@ public class BrandPayIdempotencyKeyGenerator {
         return sha256("brandpay-auto-payment-v1:" + orderNo);
     }
 
+    /** 동일한 결제의 전액 취소 재시도가 토스에서 중복 처리되지 않게 한다. */
+    public String forPaymentCancellation(Long paymentId, String paymentKey) {
+        return sha256("brandpay-payment-cancel-v1:" + paymentId + ":" + paymentKey);
+    }
+
     private String sha256(String source) {
         try {
             byte[] digest = MessageDigest.getInstance(SHA_256)

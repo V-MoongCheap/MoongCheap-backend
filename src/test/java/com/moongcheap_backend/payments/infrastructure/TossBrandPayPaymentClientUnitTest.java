@@ -23,6 +23,44 @@ import org.springframework.web.client.RestClient;
 class TossBrandPayPaymentClientUnitTest {
 
     @Test
+    void 결제를_Basic_인증과_멱등키로_전액_취소한다() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        TossBrandPayPaymentClient client = new TossBrandPayPaymentClient(
+            builder.build(), "https://api.tosspayments.com", "test-secret");
+        String basic = "Basic " + Base64.getEncoder().encodeToString(
+            "test-secret:".getBytes(StandardCharsets.UTF_8));
+
+        server.expect(requestTo(
+                "https://api.tosspayments.com/v1/payments/payment-key/cancel"))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header("Authorization", basic))
+            .andExpect(header("Idempotency-Key", "cancel-idempotency-key"))
+            .andExpect(content().json("""
+                {"cancelReason":"고객 요청"}
+                """))
+            .andRespond(withSuccess("""
+                {
+                  "paymentKey": "payment-key",
+                  "orderId": "ORDER-100",
+                  "status": "CANCELED",
+                  "cancels": [{
+                    "cancelReason": "고객 요청",
+                    "canceledAt": "2026-09-22T15:30:00+09:00",
+                    "cancelStatus": "DONE"
+                  }]
+                }
+                """, MediaType.APPLICATION_JSON));
+
+        PaymentCancellationClient.CancellationResponse response = client.cancel(
+            "payment-key", "고객 요청", "cancel-idempotency-key");
+
+        assertThat(response.status()).isEqualTo("CANCELED");
+        assertThat(response.cancelReason()).isEqualTo("고객 요청");
+        server.verify();
+    }
+
+    @Test
     void 명시적인_NOT_FOUND_PAYMENT만_미조회로_처리한다() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();

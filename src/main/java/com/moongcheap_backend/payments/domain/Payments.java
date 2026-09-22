@@ -168,4 +168,17 @@ public class Payments extends BaseTimeEntity {
         this.status = PaymentsStatus.SUCCEEDED;
         releaseForRetry();
     }
+
+    /** 토스의 전액 취소 성공 응답을 반영한다. */
+    public void cancel(String cancelReason, LocalDateTime canceledAt) {
+        if (status == PaymentsStatus.CANCELED) {
+            return;
+        }
+        if (status != PaymentsStatus.SUCCEEDED) {
+            throw new IllegalStateException("성공한 결제만 취소할 수 있습니다.");
+        }
+        this.cancelReason = cancelReason;
+        this.canceledAt = canceledAt;
+        this.status = PaymentsStatus.CANCELED;
+    }
 }
