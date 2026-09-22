@@ -20,6 +20,7 @@ import com.moongcheap_backend.demand.domain.demandBoard.DemandBoard;
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoardStatus;
 import com.moongcheap_backend.demand.infrastructure.demand.DemandBatchRepository;
 import com.moongcheap_backend.demand.infrastructure.demand.DemandRepository;
+import com.moongcheap_backend.demand.infrastructure.demandBoard.AuctionResultRow;
 import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardQueryRepository;
 import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardRepository;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.AuctionResultDto;
@@ -196,13 +197,27 @@ class DemandBoardServiceSuccessTest {
 
         @Test
         void 낙찰_결과를_조회한다() {
-            AuctionResultDto dto = mock(AuctionResultDto.class);
+            AuctionResultRow row = new AuctionResultRow(
+                DemandStatus.PAYMENT_PENDING,
+                "카탈로그",
+                "thumb.png",
+                10000,
+                3000,
+                "판매자",
+                1,
+                5,
+                5L,
+                null,
+                "낙찰 사유"
+            );
             when(demandBoardQueryRepository.getAuctionResult(1L, 10L))
-                .thenReturn(Optional.of(dto));
+                .thenReturn(Optional.of(row));
 
             AuctionResultDto result = service.getAuctionResult(10L, 1L);
 
-            assertThat(result).isSameAs(dto);
+            assertThat(result.demandStatus()).isEqualTo(DemandStatus.PAYMENT_PENDING);
+            assertThat(result.catalogName()).isEqualTo("카탈로그");
+            assertThat(result.paymentDeadlineAt()).isNull();
         }
     }
 

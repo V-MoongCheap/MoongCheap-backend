@@ -1,7 +1,6 @@
 package com.moongcheap_backend.demand.infrastructure.demandBoard;
 
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoardStatus;
-import com.moongcheap_backend.demand.presentation.demandBoard.dto.AuctionResultDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.AwardingPendingResponseDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.CatalogDemandBoardListDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.DemandBoardSummaryDto;
@@ -19,7 +18,7 @@ public interface DemandBoardQueryRepository {
     List<CatalogDemandBoardListDto.DemandBoardCardDto> getDemandBoardsByCatalogId(
         Long catalogId, Long memberId, Pageable pageable, Integer minPrice, Integer maxPrice);
 
-    Optional<AuctionResultDto> getAuctionResult(Long demandBoardId, Long memberId);
+    Optional<AuctionResultRow> getAuctionResult(Long demandBoardId, Long memberId);
 
     List<AwardingPendingResponseDto.Board> getPendingAwardingBoards(int fetchSize);
 }

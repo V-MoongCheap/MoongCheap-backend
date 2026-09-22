@@ -3,7 +3,6 @@ package com.moongcheap_backend.demand.infrastructure.demandBoard;
 import com.moongcheap_backend.common.util.JdbcTimeMapper;
 import com.moongcheap_backend.demand.domain.demand.DemandStatus;
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoardStatus;
-import com.moongcheap_backend.demand.presentation.demandBoard.dto.AuctionResultDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.AwardingPendingResponseDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.CatalogDemandBoardListDto;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.DemandBoardSummaryDto;
@@ -201,8 +200,8 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
           AND d.status IN ('ASSIGNED', 'PAYMENT_PENDING', 'CLOSED')
         """;
 
-    private static final RowMapper<AuctionResultDto> AUCTION_RESULT_MAPPER = (rs, rowNum) ->
-        AuctionResultDto.of(
+    private static final RowMapper<AuctionResultRow> AUCTION_RESULT_MAPPER = (rs, rowNum) ->
+        new AuctionResultRow(
             DemandStatus.valueOf(rs.getString("status")),
             rs.getString("catalog_name"),
             rs.getString("thumbnail_url"),
@@ -217,7 +216,7 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
         );
 
     @Override
-    public Optional<AuctionResultDto> getAuctionResult(Long demandBoardId, Long memberId) {
+    public Optional<AuctionResultRow> getAuctionResult(Long demandBoardId, Long memberId) {
         return jdbcTemplate.query(
             AUCTION_RESULT_QUERY,
             Map.of("demandBoardId", demandBoardId, "memberId", memberId),
