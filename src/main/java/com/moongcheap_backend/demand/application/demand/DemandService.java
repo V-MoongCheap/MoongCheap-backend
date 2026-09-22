@@ -150,7 +150,8 @@ public class DemandService {
     }
 
     /**
-     * DEMAND STATUS가 ASSIGNED, PAYMENT_PENDING 일 때에만 DEMANDBOARD의 참여자 수 감소 그 외에 CANCEL은 감소 X
+     * DEMAND STATUS가 ASSIGNED 일 때에만 DEMANDBOARD의 참여자 수 감소 그 외에 CANCEL은 감소 X
+     * PAYMENT_PENDING상태는취소불가(CANCELABLE_STATUSES에서 제외)
      */
     @Transactional
     public void cancel(Long memberId, Long demandId) {

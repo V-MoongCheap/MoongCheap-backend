@@ -103,17 +103,17 @@ class CategoryControllerIntegrationTest extends AbstractIntegrationTest {
         @Test
         @DisplayName("depth=1이지만 parentId를 명시하면 findByDepthAndParentId 경로로 조회한다")
         void filtersByParentIdEvenAtDepthOne() throws Exception {
-            categoryFixture.save(null, "식품", (short) 1);
-            Category withParent = categoryFixture.save(1L, "특이케이스", (short) 1);
+            Category parent = categoryFixture.save(null, "식품", (short) 1);
+            Category withParent = categoryFixture.save(parent.getId(), "특이케이스", (short) 1);
 
             mockMvc.perform(get("/api/categories")
                     .param("depth", "1")
-                    .param("parentId", "1")
+                    .param("parentId", parent.getId().toString())
                     .cookie(sessionCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(withParent.getId()))
-                .andExpect(jsonPath("$[0].parentId").value(1));
+                .andExpect(jsonPath("$[0].parentId").value(parent.getId()));
         }
     }
 }

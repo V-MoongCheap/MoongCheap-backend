@@ -44,12 +44,21 @@ class SellerRegistrationSameMemberConcurrencyTest extends AbstractConcurrencyTes
     void onlyOneRegistrationSucceedsForSameMember() throws Exception {
         int threadCount = 50;
 
+        int[] weights = {1, 3, 7, 1, 3, 7, 1, 3, 5};
         // 1. 서로 다른 N개의 사업자 등록 요청 DTO 생성
         List<SellerRegisterRequestDto> requests = new ArrayList<>();
         for (int i = 0; i < threadCount; i++) {
+            String first9 = String.format("12345%04d", i);
+            int sum = 0;
+            for (int p = 0; p < 9; p++) {
+                sum += Character.getNumericValue(first9.charAt(p)) * weights[p];
+            }
+            sum += (Character.getNumericValue(first9.charAt(8)) * 5) / 10;
+            int check = (10 - (sum % 10)) % 10;
+            String businessNumber = first9 + check;
             requests.add(new SellerRegisterRequestDto(
                 "가게_" + i,
-                String.format("123-45-%05d", 10000 + i), // 서로 다른 유효 형식 사업자번호
+                businessNumber,
                 "2024-서울강남-" + (1234 + i),
                 "홍길동",
                 "010-1111-" + String.format("%04d", i)

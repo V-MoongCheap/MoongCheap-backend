@@ -19,9 +19,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 @DisplayName("ProductCatalogController 통합 테스트")
 class ProductCatalogControllerIntegrationTest extends AbstractIntegrationTest {
 
-    @Autowired private MemberFixture memberFixture;
-    @Autowired private ProductCatalogFixture productCatalogFixture;
-    @Autowired private SessionTestHelper sessionTestHelper;
+    @Autowired
+    private MemberFixture memberFixture;
+    @Autowired
+    private ProductCatalogFixture productCatalogFixture;
+    @Autowired
+    private SessionTestHelper sessionTestHelper;
 
     private Cookie sessionCookie;
 
@@ -46,7 +49,10 @@ class ProductCatalogControllerIntegrationTest extends AbstractIntegrationTest {
             mockMvc.perform(get("/api/product-catalog").cookie(sessionCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.list.length()").value(9))
-                .andExpect(jsonPath("$.totalCount").value(9));
+                .andExpect(jsonPath("$.totalCount").value(9))
+                .andExpect(jsonPath("$.totalCount").value(9))
+                .andExpect(jsonPath("$.list[0].name").value("도감9"))
+                .andExpect(jsonPath("$.list[8].name").value("도감1"));
         }
 
         @Test
