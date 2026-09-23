@@ -589,37 +589,38 @@ pipeline {
         }
     }
 
-post {
-    always {
-        script {
-            try {
-                withCredentials([
-                    string(
-                        credentialsId: 'discord-webhook-ci',
-                        variable: 'DISCORD_WEBHOOK'
-                    )
-                ]) {
-                    discordSend(
-                        webhookURL: env.DISCORD_WEBHOOK,
-                        title: "Backend CI #${env.BUILD_NUMBER}",
-                        description: "결과: ${currentBuild.currentResult}",
-                        result: currentBuild.currentResult
-                    )
+    post {
+        always {
+            script {
+                try {
+                    withCredentials([
+                        string(
+                            credentialsId: 'discord-webhook-ci',
+                            variable: 'DISCORD_WEBHOOK'
+                        )
+                    ]) {
+                        discordSend(
+                            webhookURL: env.DISCORD_WEBHOOK,
+                            title: "Backend CI #${env.BUILD_NUMBER}",
+                            description: "결과: ${currentBuild.currentResult}",
+                            result: currentBuild.currentResult
+                        )
+                    }
+
+                    echo 'Discord CI 알림 전송 완료'
+
+                } catch (Exception e) {
+                    echo "Discord CI 알림 전송 실패: ${e.getClass().getSimpleName()}"
                 }
-
-                echo 'Discord CI 알림 전송 완료'
-
-            } catch (Exception e) {
-                echo "Discord CI 알림 전송 실패: ${e.getClass().getSimpleName()}"
             }
         }
-    }
 
-    success {
-        echo "Backend CI 완료: ${ECR_REPO}:${IMAGE_TAG}. GitOps PR Merge 후 ArgoCD Sync 진행."
-    }
+        success {
+            echo "Backend CI 완료: ${ECR_REPO}:${IMAGE_TAG}. GitOps PR Merge 후 ArgoCD Sync 진행."
+        }
 
-    failure {
-        echo 'Backend CI 실패 — Jenkins 로그에서 실패 Stage 확인 필요.'
+        failure {
+            echo 'Backend CI 실패 — Jenkins 로그에서 실패 Stage 확인 필요.'
+        }
     }
 }
