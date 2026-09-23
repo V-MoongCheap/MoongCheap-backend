@@ -44,17 +44,17 @@ public class GroupBuyOrderCreationConsumer {
             try {
                 groupBuyId = orderCreationStream.getGroupBuyId(record);
             } catch (IllegalArgumentException exception) {
-                // 필수 값이 없는 메시지는 재처리해도 성공할 수 없으므로 제거한다.
+                // 필수 값이 없는 메시지는 재처리해도 성공할 수 없으므로 ACK 후 삭제한다.
                 log.warn("Discarding invalid group-buy order creation message: id={}",
                     record.getId(), exception);
-                orderCreationStream.acknowledge(record);
+                orderCreationStream.acknowledgeAndDelete(record);
                 continue;
             }
 
             try {
-                // 별도 트랜잭션의 주문 생성 커밋이 끝난 후에만 ACK한다.
+                // 별도 트랜잭션의 주문 생성 커밋이 끝난 후에만 ACK 후 삭제한다.
                 orderService.autoCreateOrder(groupBuyId);
-                orderCreationStream.acknowledge(record);
+                orderCreationStream.acknowledgeAndDelete(record);
             } catch (RuntimeException exception) {
                 // ACK하지 않은 메시지는 Pending에 남고 유휴 시간이 지나면 다시 회수된다.
                 log.warn("Group-buy order creation failed: id={}", record.getId(), exception);
