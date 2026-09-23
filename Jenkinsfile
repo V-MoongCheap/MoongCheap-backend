@@ -128,27 +128,6 @@ pipeline {
                             echo "Docker Engine 연결 확인"
                             echo "Testcontainers Host: $TESTCONTAINERS_HOST_OVERRIDE"
 
-                            READY=0
-
-                            for i in $(seq 1 60); do
-                                if curl -fsS --max-time 2 \
-                                  http://127.0.0.1:2375/_ping 2>/dev/null \
-                                  | grep -q OK; then
-
-                                    READY=1
-                                    break
-                                fi
-
-                                sleep 2
-                            done
-
-                            if [ "$READY" -ne 1 ]; then
-                                echo "Docker Engine 연결 실패"
-                                exit 1
-                            fi
-
-                            echo "Docker Engine 연결 성공"
-
                             chmod +x gradlew
                             ./gradlew test -PskipContainerTests --no-daemon
                         '''
