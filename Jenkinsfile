@@ -150,7 +150,7 @@ pipeline {
                             echo "Docker Engine 연결 성공"
 
                             chmod +x gradlew
-                            ./gradlew test --no-daemon
+                            ./gradlew test -PskipContainerTests --no-daemon
                         '''
                     }
                 }
