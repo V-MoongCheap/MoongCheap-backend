@@ -27,7 +27,9 @@ server:
   servlet:
     session:
       cookie:
-        secure: true
+        # HTTP localhost에서는 Secure 쿠키가 BrandPay 콜백 요청에 전달되지 않을 수 있다.
+        # HTTPS 개발 서버에서는 SESSION_COOKIE_SECURE=true로 덮어쓴다.
+        secure: "${SESSION_COOKIE_SECURE:false}"
         same-site: lax
 
 moongcheap:

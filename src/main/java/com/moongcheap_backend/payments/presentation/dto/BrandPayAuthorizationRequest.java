@@ -1,0 +1,20 @@
+package com.moongcheap_backend.payments.presentation.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+/**
+ * 프론트엔드가 브랜드페이 SDK 인증을 완료한 뒤 백엔드에 전달하는 요청이다.
+ * 시크릿 키와 발급된 토큰은 프론트엔드에서 다루지 않는다.
+ */
+public record BrandPayAuthorizationRequest(
+    // SDK 인증에 사용한 구매자 식별키로, 로그인 회원에게 발급된 값과 일치해야 한다.
+    @NotBlank
+    @Size(min = 2, max = 50)
+    String customerKey,
+
+    // 토큰 발급에 한 번만 사용할 수 있는 임시 Authorization Code이다.
+    @NotBlank
+    String code
+) {
+}

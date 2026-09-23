@@ -1,12 +1,10 @@
-package com.moongcheap_backend.payments.domain;
+package com.moongcheap_backend.payout.domain;
 
 import com.moongcheap_backend.common.entity.BaseTimeEntity;
 import com.moongcheap_backend.member.domain.Seller;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.MapsId;
@@ -22,6 +20,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "seller_key")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SellerKey extends BaseTimeEntity {
+
     @Id
     private Long sellerId;
 
@@ -32,4 +31,9 @@ public class SellerKey extends BaseTimeEntity {
 
     @Column(name = "seller_key", nullable = false, unique = true, length = 20)
     private String sellerKey;
+
+    public SellerKey(Seller seller, String sellerKey) {
+        this.seller = seller;
+        this.sellerKey = sellerKey;
+    }
 }

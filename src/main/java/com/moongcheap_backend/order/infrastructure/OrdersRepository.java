@@ -15,6 +15,31 @@ import org.springframework.data.repository.query.Param;
 
 public interface OrdersRepository extends JpaRepository<Orders, Long> {
 
+    @Query(value = """
+        select o.id from orders o join group_buy g on g.id = o.group_buy_id
+        where g.status = 'RECRUITMENT_COMPLETED' and o.order_status = 'PAYMENT_PENDING'
+          and o.id > :afterId
+          and not exists (select 1 from payments p where p.order_id = o.id)
+        order by o.id limit :batchSize
+        """, nativeQuery = true)
+    List<Long> findUnscheduledPaymentOrderIds(@Param("afterId") long afterId,
+        @Param("batchSize") int batchSize);
+
+    @Query(value = """
+        select o.id from orders o join group_buy g on g.id = o.group_buy_id
+        where o.group_buy_id = :groupBuyId
+          and g.status = 'RECRUITMENT_COMPLETED'
+          and o.order_status = 'PAYMENT_PENDING'
+          and o.id > :afterId
+          and not exists (select 1 from payments p where p.order_id = o.id)
+        order by o.id limit :batchSize
+        """, nativeQuery = true)
+    List<Long> findUnscheduledPaymentOrderIdsByGroupBuy(
+        @Param("groupBuyId") Long groupBuyId,
+        @Param("afterId") long afterId,
+        @Param("batchSize") int batchSize
+    );
+
     @Query("select o.demandId from Orders o where o.demandId in :demandIds")
     List<Long> findExistingDemandIds(@Param("demandIds") Collection<Long> demandIds);
 
@@ -40,4 +65,30 @@ public interface OrdersRepository extends JpaRepository<Orders, Long> {
     );
 
     boolean existsByMemberIdAndOrderStatusIn(Long memberId, Collection<OrderStatus> statuses);
+
+    @Query("""
+        select o.orderStatus as orderStatus, count(o) as count
+        from Orders o
+        where o.memberId = :memberId
+          and o.orderStatus in :statuses
+        group by o.orderStatus
+        """)
+    List<OrderStatusCount> countByMemberIdAndOrderStatusIn(
+        @Param("memberId") Long memberId,
+        @Param("statuses") Collection<OrderStatus> statuses
+    );
+
+    /** 자동결제 요청에 필요한 주문과 저장된 결제수단을 함께 조회한다. */
+    @Query("""
+        select o
+        from Orders o
+        left join fetch o.brandPayMethod
+        where o.id = :orderId
+        """)
+    Optional<Orders> findByIdForAutomaticPayment(@Param("orderId") Long orderId);
+
+    /** 승인 결과 저장 시 같은 주문의 중복 완료를 막기 위한 배타 잠금 조회다. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Orders o where o.id = :orderId")
+    Optional<Orders> findByIdForPaymentUpdate(@Param("orderId") Long orderId);
 }

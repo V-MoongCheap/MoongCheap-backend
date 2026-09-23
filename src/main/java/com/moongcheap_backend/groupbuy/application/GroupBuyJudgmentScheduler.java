@@ -3,6 +3,7 @@ package com.moongcheap_backend.groupbuy.application;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.groupbuy.infrastructure.GroupBuyJudgmentSchedule;
+import com.moongcheap_backend.payments.application.GroupPaymentReservationService;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Set;
@@ -21,6 +22,7 @@ public class GroupBuyJudgmentScheduler {
 
     private final GroupBuyJudgmentSchedule judgmentSchedule;
     private final GroupBuyJudgmentService judgmentService;
+    private final GroupPaymentReservationService paymentReservationService;
 
     // Sorted Set은 작업을 자동 삭제하지 않으므로 완료된 판정만 명시적으로 제거한다.
     @Scheduled(fixedDelayString = "${moongcheap.group-buy.judgment-poll-delay-ms}")
@@ -44,7 +46,17 @@ public class GroupBuyJudgmentScheduler {
         }
 
         try {
-            judgmentService.judgeAndPay(groupBuyId);
+            boolean recruitmentCompleted = judgmentService.judgeAndPay(groupBuyId);
+            if (recruitmentCompleted) {
+                // judgeAndPay의 트랜잭션이 반환되며 커밋된 뒤 결제 예약을 생성한다.
+                try {
+                    paymentReservationService.scheduleForGroup(groupBuyId);
+                } catch (RuntimeException exception) {
+                    // 판정은 이미 커밋됐으므로 되돌리지 않는다. 복구 스케줄러가 보완한다.
+                    log.warn("Payment reservation deferred after group-buy judgment: groupBuyId={}",
+                        groupBuyId);
+                }
+            }
             judgmentSchedule.remove(groupBuyId);
         } catch (BusinessException exception) {
             // 다른 워커가 이미 판정했거나 삭제된 데이터는 재시도할 필요가 없다.

@@ -52,6 +52,9 @@ public class SecurityConfig {
                     "/api/auth/signup",
                     "/api/auth/login",
                     "/api/auth/login-id-availability",
+                    // local/dev 프로필에서만 컨트롤러가 존재하는 BrandPay 테스트 세션 API
+                    "/api/dev/brandpay-test/login",
+                    "/api/dev/brandpay-test/fresh-login",
                     "/api/members/nicknames/**",
                     "/api/sellers/*/public",
                     "/oauth2/**",

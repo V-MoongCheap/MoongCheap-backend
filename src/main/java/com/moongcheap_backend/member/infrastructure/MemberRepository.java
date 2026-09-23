@@ -1,6 +1,8 @@
 package com.moongcheap_backend.member.infrastructure;
 
 import com.moongcheap_backend.member.domain.Member;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +14,11 @@ import java.util.Set;
 public interface MemberRepository extends JpaRepository<Member, Long> {
     Optional<Member> findByLoginIdAndDeletedAtIsNull(String loginId);
     Optional<Member> findByIdAndDeletedAtIsNull(Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM Member m WHERE m.id = :id AND m.deletedAt IS NULL")
+    Optional<Member> findByIdAndDeletedAtIsNullForUpdate(@Param("id") Long id);
+
     boolean existsByIdAndDeletedAtIsNull(Long id);
     boolean existsByLoginIdAndDeletedAtIsNull(String loginId);
     boolean existsByNicknameAndDeletedAtIsNull(String nickname);

@@ -19,12 +19,13 @@ public class GroupBuyJudgmentService {
 
     // 판정과 상태 변경을 커밋한 뒤에만 호출자가 Redis 예약을 제거할 수 있다.
     @Transactional
-    public void judgeAndPay(Long groupBuyId) {
+    public boolean judgeAndPay(Long groupBuyId) {
         boolean targetReached = judge(groupBuyId);
 
         if (targetReached) {
-            //결제 큐에다가 던지기
+            // 결제 예약은 이 트랜잭션이 커밋된 뒤 GroupBuyJudgmentScheduler가 연결한다.
         }
+        return targetReached;
     }
 
     // 저장소가 OPEN이면서 판정 시각이 지난 행만 반환하므로 결과는 성공/실패 둘 중 하나다.

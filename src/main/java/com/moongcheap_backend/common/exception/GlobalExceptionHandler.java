@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -86,6 +87,16 @@ public class GlobalExceptionHandler {
         ErrorCode ec = ErrorCode.CONCURRENT_REQUEST_CONFLICT;
         return ResponseEntity.status(ec.getStatus())
                 .body(ApiError.of(ec.getCode(), ec.getMessage()));
+    }
+
+    /** @Version으로 감지한 오래된 저장 요청은 클라이언트가 재시도할 수 있는 충돌로 응답한다. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiError> handleOptimisticLock(
+        ObjectOptimisticLockingFailureException e
+    ) {
+        ErrorCode ec = ErrorCode.CONCURRENT_REQUEST_CONFLICT;
+        return ResponseEntity.status(ec.getStatus())
+            .body(ApiError.of(ec.getCode(), ec.getMessage()));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

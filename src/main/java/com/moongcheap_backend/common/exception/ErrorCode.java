@@ -89,6 +89,22 @@ public enum ErrorCode {
 
     // Payments
     BRAND_PAY_METHOD_NOT_FOUND(HttpStatus.NOT_FOUND, "PAY_001", "유효한 결제 수단을 찾을 수 없습니다."),
+    SELLER_KEY_ISSUE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PAY_002", "판매자 식별키 발급에 실패했습니다."),
+    CUSTOMER_KEY_ISSUE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PAY_003", "소비자 식별키 발급에 실패했습니다."),
+    BRAND_PAY_CUSTOMER_MISMATCH(HttpStatus.FORBIDDEN, "PAY_004", "브랜드페이 소비자 정보가 일치하지 않습니다."),
+    BRAND_PAY_TOKEN_ISSUE_FAILED(HttpStatus.BAD_GATEWAY, "PAY_005", "브랜드페이 인증 토큰 발급에 실패했습니다."),
+    CUSTOMER_KEY_NOT_FOUND(HttpStatus.CONFLICT, "PAY_006", "브랜드페이 소비자 식별키가 발급되지 않았습니다."),
+    BRAND_PAY_TOKEN_REFRESH_FAILED(HttpStatus.BAD_GATEWAY, "PAY_007", "브랜드페이 인증 토큰 갱신에 실패했습니다."),
+    BRAND_PAY_TOKEN_NOT_FOUND(HttpStatus.NOT_FOUND, "PAY_008", "브랜드페이 인증 토큰을 찾을 수 없습니다."),
+    BRAND_PAY_ACCESS_TOKEN_UNAVAILABLE(HttpStatus.INTERNAL_SERVER_ERROR, "PAY_009", "브랜드페이 Access Token을 사용할 수 없습니다."),
+    BRAND_PAY_METHOD_LOOKUP_FAILED(HttpStatus.BAD_GATEWAY, "PAY_010", "브랜드페이 결제수단 조회에 실패했습니다."),
+    BRAND_PAY_METHOD_SYNC_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PAY_011", "브랜드페이 결제수단 동기화에 실패했습니다."),
+    BRAND_PAY_METHOD_REMOVE_FAILED(HttpStatus.BAD_GATEWAY, "PAY_012", "브랜드페이 결제수단 삭제에 실패했습니다."),
+    BRAND_PAY_AUTO_PAYMENT_NOT_ALLOWED(HttpStatus.CONFLICT, "PAY_013", "자동결제를 실행할 수 없는 주문입니다."),
+    BRAND_PAY_AUTO_PAYMENT_FAILED(HttpStatus.BAD_GATEWAY, "PAY_014", "브랜드페이 자동결제에 실패했습니다."),
+    PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PAY_015", "결제를 찾을 수 없습니다."),
+    PAYMENT_CANNOT_CANCEL(HttpStatus.CONFLICT, "PAY_016", "현재 상태에서는 결제를 취소할 수 없습니다."),
+    PAYMENT_CANCEL_FAILED(HttpStatus.BAD_GATEWAY, "PAY_017", "결제 취소에 실패했습니다."),
 
     // Search
     SEARCH_INDEX_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "SEARCH_001", "상품 검색 인덱싱에 실패했습니다.");

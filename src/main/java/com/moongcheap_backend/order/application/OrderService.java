@@ -11,6 +11,7 @@ import com.moongcheap_backend.member.application.OrderMemberInfoService;
 import com.moongcheap_backend.member.domain.Seller;
 import com.moongcheap_backend.order.domain.OrderStatus;
 import com.moongcheap_backend.order.domain.Orders;
+import com.moongcheap_backend.order.infrastructure.OrderStatusCount;
 import com.moongcheap_backend.order.infrastructure.OrdersRepository;
 import com.moongcheap_backend.order.presentation.OrderController.OrderListTab;
 import com.moongcheap_backend.order.presentation.dto.OrderDetailResponse;
@@ -20,14 +21,17 @@ import com.moongcheap_backend.order.presentation.dto.OrderDetailResponse.Product
 import com.moongcheap_backend.order.presentation.dto.OrderDetailResponse.ShippingInfo;
 import com.moongcheap_backend.order.presentation.dto.OrderListResponse;
 import com.moongcheap_backend.order.presentation.dto.OrderShippingAddressRequest;
+import com.moongcheap_backend.order.presentation.dto.OrderSummaryResponse;
 import com.moongcheap_backend.payments.application.PaymentPublicService;
 import com.moongcheap_backend.payments.domain.BrandPayMethod;
 import com.moongcheap_backend.payments.presentation.dto.OrderPaymentInfo;
 import com.moongcheap_backend.product.domain.product.Product;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -42,6 +46,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class OrderService {
 
     private static final int ORDER_BATCH_SIZE = 20;
+    private static final Set<OrderStatus> SUMMARY_STATUSES = Set.of(
+        OrderStatus.PAYMENT_COMPLETED,
+        OrderStatus.PREPARING_SHIPMENT,
+        OrderStatus.SHIPPED,
+        OrderStatus.DELIVERED
+    );
 
     //repo
     private final OrdersRepository ordersRepository;
@@ -169,6 +179,24 @@ public class OrderService {
         };
 
         return orders.map(this::toOrderListResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public OrderSummaryResponse getSummary(Long memberId) {
+        orderMemberInfoService.validateActiveMember(memberId);
+
+        Map<OrderStatus, Long> counts = new EnumMap<>(OrderStatus.class);
+        for (OrderStatusCount result
+            : ordersRepository.countByMemberIdAndOrderStatusIn(memberId, SUMMARY_STATUSES)) {
+            counts.put(result.getOrderStatus(), result.getCount());
+        }
+
+        return new OrderSummaryResponse(
+            counts.getOrDefault(OrderStatus.PAYMENT_COMPLETED, 0L),
+            counts.getOrDefault(OrderStatus.PREPARING_SHIPMENT, 0L),
+            counts.getOrDefault(OrderStatus.SHIPPED, 0L),
+            counts.getOrDefault(OrderStatus.DELIVERED, 0L)
+        );
     }
 
     //주문상세조회
