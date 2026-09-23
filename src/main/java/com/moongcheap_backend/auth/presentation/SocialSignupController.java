@@ -31,8 +31,7 @@ public class SocialSignupController {
         @RequestBody @Valid SocialSignupCompleteRequestDto request,
         HttpServletRequest httpRequest) {
         SessionPrincipal refreshed = socialSignupCompleteService.complete(principal.memberId(), request);
-        httpRequest.changeSessionId();
-        sessionManager.refreshPrincipal(httpRequest, refreshed);
+        sessionManager.bindPrincipal(httpRequest, refreshed, false);
         return ResponseEntity.noContent().build();
     }
 }
