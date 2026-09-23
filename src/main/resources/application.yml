@@ -128,3 +128,7 @@ moongcheap:
       salt: "${MOONGCHEAP_ENC_SALT:dc3eee6f931d5dd91c5a8516716caa4e}"
     # 내부 API 인증 키. 추후 AWS Parameter Store로 관리 예정
     internal-api-key: "${MOONGCHEAP_INTERNAL_API_KEY:}"
+  time:
+    # 시각 5분 단위 올림(TimeUtils.ceilToFiveMinuteMark) 우회 스위치
+    # true 로 두면 원본 시각 그대로 사용 (테스트/디버깅 용도)
+    ceil-bypass: false

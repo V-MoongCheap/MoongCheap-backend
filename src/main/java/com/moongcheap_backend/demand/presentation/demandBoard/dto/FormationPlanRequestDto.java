@@ -40,12 +40,13 @@ public record FormationPlanRequestDto(
 
         private static final int SALE_DURATION_DAYS = 5;
 
-        public DemandBoard toEntity() {
+        public DemandBoard toEntity(boolean bypass) {
             return DemandBoard.builder()
                 .catalogId(catalogId)
                 .priceMin(priceMin)
                 .priceMax(priceMax)
-                .saleEndAt(TimeUtils.ceilToFiveMinuteMark(LocalDateTime.now().plusDays(SALE_DURATION_DAYS)))
+                .saleEndAt(TimeUtils.ceilToFiveMinuteMark(
+                    LocalDateTime.now().plusDays(SALE_DURATION_DAYS), bypass))
                 .participantCount(demandIds.size())
                 .status(DemandBoardStatus.GB_GATHERING)
                 .build();

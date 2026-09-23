@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -42,6 +43,9 @@ public class DemandService {
     private final RejectHistoryRepository rejectHistoryRepository;
     private final BrandPayMethodRepository brandPayMethodRepository;
     private final ProductRepository productRepository;
+
+    @Value("${moongcheap.time.ceil-bypass:false}")
+    private boolean bypass;
 
     private static final Set<DemandStatus> PRODUCT_ATTACHED_STATUSES = Set.of(
         DemandStatus.PAYMENT_PENDING,
@@ -75,7 +79,7 @@ public class DemandService {
             .payMethodId(request.payMethodId())
             .desiredPriceMin(request.desiredPriceMin())
             .desiredPriceMax(request.desiredPriceMax())
-            .desireEndAt(TimeUtils.ceilToFiveMinuteMark(LocalDateTime.now().plusDays(2)))
+            .desireEndAt(TimeUtils.ceilToFiveMinuteMark(LocalDateTime.now().plusDays(2), bypass))
             .quantity(request.quantity())
             .extraRequirement(request.extraRequirement())
             .isSubstitutable(request.isSubstitutable())

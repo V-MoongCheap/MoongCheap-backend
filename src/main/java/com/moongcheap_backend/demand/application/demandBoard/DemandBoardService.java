@@ -3,6 +3,7 @@ package com.moongcheap_backend.demand.application.demandBoard;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.common.schema.InternalSchemaVersions;
+import com.moongcheap_backend.common.util.TimeUtils;
 import com.moongcheap_backend.demand.domain.demand.Demand;
 import com.moongcheap_backend.demand.domain.demand.DemandStatus;
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoard;
@@ -10,6 +11,7 @@ import com.moongcheap_backend.demand.domain.demandBoard.DemandBoardStatus;
 import com.moongcheap_backend.demand.infrastructure.demand.DemandBatchRepository;
 import com.moongcheap_backend.demand.infrastructure.demand.DemandBatchRepository.AssignToBoardArgs;
 import com.moongcheap_backend.demand.infrastructure.demand.DemandRepository;
+import com.moongcheap_backend.demand.infrastructure.demandBoard.AuctionResultRow;
 import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardQueryRepository;
 import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardRepository;
 import com.moongcheap_backend.demand.presentation.demandBoard.dto.AuctionResultDto;
@@ -52,6 +54,7 @@ import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -78,6 +81,9 @@ public class DemandBoardService {
     @Lazy
     @Autowired
     private DemandBoardService self;
+
+    @Value("${moongcheap.time.ceil-bypass:false}")
+    private boolean bypass;
 
     @Transactional(readOnly = true)
     public boolean hasProductBoard(Long productBoardId) {
@@ -117,8 +123,28 @@ public class DemandBoardService {
 
     @Transactional(readOnly = true)
     public AuctionResultDto getAuctionResult(Long memberId, Long demandBoardId) {
-        return demandBoardQueryRepository.getAuctionResult(demandBoardId, memberId)
+        AuctionResultRow row = demandBoardQueryRepository.getAuctionResult(demandBoardId, memberId)
             .orElseThrow(() -> new BusinessException(ErrorCode.DEMAND_BOARD_NOT_FOUND));
+        return new AuctionResultDto(
+            row.demandStatus(),
+            row.catalogName(),
+            row.catalogThumbnailUrl(),
+            row.unitPrice(),
+            row.shippingFee(),
+            row.sellerName(),
+            row.quantity(),
+            row.participantCount(),
+            row.totalParticipantQuantity(),
+            calculatePaymentDeadline(row.judgedAt()),
+            row.awardReason()
+        );
+    }
+
+    public LocalDateTime calculatePaymentDeadline(LocalDateTime judgedAt) {
+        if (judgedAt == null) {
+            return null;
+        }
+        return TimeUtils.ceilToFiveMinuteMark(judgedAt.plusHours(48), bypass);
     }
 
     @Transactional(readOnly = true)
@@ -261,7 +287,7 @@ public class DemandBoardService {
         List<FormationPlanRequestDto.NewBoard> newBoards,
         LocalDateTime now) {
         List<DemandBoard> savedList = newBoards.stream()
-            .map(newBoard -> demandBoardRepository.save(newBoard.toEntity()))
+            .map(newBoard -> demandBoardRepository.save(newBoard.toEntity(bypass)))
             .toList();
         List<AssignToBoardArgs> args = IntStream.range(0, newBoards.size())
             .mapToObj(i -> new AssignToBoardArgs(

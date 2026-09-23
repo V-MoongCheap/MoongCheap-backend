@@ -1,19 +1,19 @@
-package com.moongcheap_backend.demand.presentation.demandBoard.dto;
+package com.moongcheap_backend.demand.infrastructure.demandBoard;
 
 import com.moongcheap_backend.demand.domain.demand.DemandStatus;
 import java.time.LocalDateTime;
 
-public record AuctionResultDto(
+public record AuctionResultRow(
     DemandStatus demandStatus,
     String catalogName,
-    String thumbnail_url,
+    String catalogThumbnailUrl,
     Integer unitPrice,
     Integer shippingFee,
     String sellerName,
     Integer quantity,
     Integer participantCount,
     Long totalParticipantQuantity,
-    LocalDateTime paymentDeadlineAt,
+    LocalDateTime judgedAt,
     String awardReason
 ) {
 

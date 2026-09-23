@@ -58,3 +58,6 @@ docs/demand-board-refactoring-full-log.md
 .env
 .env.*
 !.env.example
+
+### Local seed (EXPLAIN 검증 용도, 커밋 제외) ###
+src/main/resources/db/seed/pending_awarding_seed.sql
