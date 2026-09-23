@@ -150,7 +150,7 @@ pipeline {
                     sh '''
                         set -eu
 
-                        TRIVY_VERSION=0.56.2
+                        TRIVY_VERSION=0.74.0
 
                         curl -fSL \
                           -o trivy.tar.gz \
@@ -243,7 +243,7 @@ pipeline {
                           --quiet \
                           awscli
 
-                        TRIVY_VERSION=0.56.2
+                        TRIVY_VERSION=0.74.0
 
                         curl -fSL \
                           -o trivy.tar.gz \
