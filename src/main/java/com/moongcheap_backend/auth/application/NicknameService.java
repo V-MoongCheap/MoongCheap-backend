@@ -37,7 +37,6 @@ public class NicknameService {
             candidate == null || candidate.isBlank() ? "user" : candidate));
 
         List<String> candidates = new ArrayList<>(10);
-        candidates.add(base);
         while (candidates.size() < 10) {
             int suffix = ThreadLocalRandom.current().nextInt(1000, 10000000);
             String name = truncate(base, 20 - String.valueOf(suffix).length()) + suffix;

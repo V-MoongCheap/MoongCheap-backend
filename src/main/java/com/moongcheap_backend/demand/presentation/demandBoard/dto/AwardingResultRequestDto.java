@@ -20,7 +20,7 @@ public record AwardingResultRequestDto(
     @NotBlank String schemaVersion,
     @NotNull OffsetDateTime plannedAt,
     @NotBlank @Size(max = 200) String ruleVersion,
-    @NotNull @Valid @NotEmpty @Size(max = 100) List<BoardResult> results
+    @NotNull @Valid @NotEmpty @Size(max = 50) List<BoardResult> results
 ) {
 
     @AssertTrue(message = "results의 boardId는 중복될 수 없습니다")
@@ -38,7 +38,7 @@ public record AwardingResultRequestDto(
     public record BoardResult(
         @NotNull Long boardId,
         @NotNull LocalDateTime judgedAt,
-        @NotNull @Valid @NotEmpty @Size(max = 50) List<Evaluation> evaluations
+        @NotNull @Valid @NotEmpty List<Evaluation> evaluations
     ) {
 
         @AssertTrue(message = "evaluations의 productId는 중복될 수 없습니다")

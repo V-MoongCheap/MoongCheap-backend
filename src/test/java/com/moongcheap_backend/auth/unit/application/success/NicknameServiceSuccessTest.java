@@ -70,7 +70,9 @@ class NicknameServiceSuccessTest {
 
             String result = nicknameService.allocateForSocial("홍길동");
 
-            assertThat(result).isEqualTo("홍길동");
+            assertThat(result).startsWith("홍길동");
+            assertThat(result).isNotEqualTo("홍길동");
+            assertThat(result).matches("홍길동\\d+");
         }
 
         @Test
