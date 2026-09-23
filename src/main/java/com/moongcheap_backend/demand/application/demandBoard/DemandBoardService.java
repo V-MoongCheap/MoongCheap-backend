@@ -412,6 +412,7 @@ public class DemandBoardService {
         demand.substituteOffer(demandBoardId);
     }
 
+    // 부하 테스트 대상
     public AwardingResultResponseDto applyAwardingResult(AwardingResultRequestDto request) {
         int appliedCount = 0;
         int staleRejectedCount = 0;
