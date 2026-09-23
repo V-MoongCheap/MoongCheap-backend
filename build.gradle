@@ -69,6 +69,15 @@ springBoot {
 tasks.named('test') {
     useJUnitPlatform()
     systemProperty 'user.timezone', 'Asia/Seoul'
+
+    // Docker(Testcontainers)가 없는 CI 환경에서는 -PskipContainerTests로 통합/동시성 테스트 스킵
+    if (project.hasProperty('skipContainerTests')) {
+        exclude '**/integration/**'
+        exclude '**/concurrency/**'
+        exclude '**/MoongCheapBackendApplicationTests.class'
+        exclude '**/*RedisTest.class'
+    }
+
     finalizedBy tasks.named('jacocoTestReport')
 }
 
