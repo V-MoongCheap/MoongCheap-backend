@@ -53,13 +53,31 @@ public class BrandPayMethodSyncService {
         Set<String> receivedMethodKeys = new HashSet<>();
         List<BrandPayMethod> synchronizedMethods = new ArrayList<>(existingMethods);
 
+        Set<String> snapshotMethodKeys = snapshots.stream()
+            .map(MethodSnapshot::methodKey)
+            .collect(java.util.stream.Collectors.toSet());
+        String localDefaultMethodKey = existingMethods.stream()
+            .filter(method -> method.getIsDefault()
+                && snapshotMethodKeys.contains(method.getMethodKey()))
+            .map(BrandPayMethod::getMethodKey)
+            .findFirst()
+            .orElse(null);
+
+        // 아래 saveAll에서 새 기본값이 먼저 반영되더라도 회원당 1개 UNIQUE 제약과
+        // 충돌하지 않도록 DB의 기존 기본 표시를 먼저 해제한다. clearAutomatically로
+        // 분리된 엔티티들은 마지막 saveAll에서 최종 상태로 병합된다.
+        brandPayMethodRepository.unmarkAllDefaults(memberId);
+
         for (MethodSnapshot snapshot : snapshots) {
             if (!receivedMethodKeys.add(snapshot.methodKey())) {
                 throw new BusinessException(ErrorCode.BRAND_PAY_METHOD_SYNC_FAILED);
             }
 
-            boolean isDefault = Objects.equals(
-                response.selectedMethodId(), snapshot.externalId());
+            // 사용자가 앱에서 고른 기본값을 우선 보존한다. 유효한 로컬 기본값이 없을 때만
+            // 토스가 내려준 최근 등록·사용 수단을 최초 기본값으로 사용한다.
+            boolean isDefault = localDefaultMethodKey != null
+                ? Objects.equals(localDefaultMethodKey, snapshot.methodKey())
+                : Objects.equals(response.selectedMethodId(), snapshot.externalId());
             BrandPayMethod existing = existingByMethodKey.get(snapshot.methodKey());
             if (existing == null) {
                 synchronizedMethods.add(new BrandPayMethod(

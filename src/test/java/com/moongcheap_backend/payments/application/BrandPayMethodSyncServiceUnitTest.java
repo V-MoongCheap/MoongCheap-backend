@@ -72,6 +72,7 @@ class BrandPayMethodSyncServiceUnitTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<BrandPayMethod>> captor = ArgumentCaptor.forClass(List.class);
         verify(brandPayMethodRepository).saveAllAndFlush(captor.capture());
+        verify(brandPayMethodRepository).unmarkAllDefaults(1L);
         List<BrandPayMethod> savedMethods = captor.getValue();
 
         assertThat(savedMethods).hasSize(3);
@@ -91,5 +92,32 @@ class BrandPayMethodSyncServiceUnitTest {
         assertThat(newAccount.getType()).isEqualTo(PaymentType.ACCOUNT);
         assertThat(newAccount.getIsDefault()).isFalse();
         assertThat(newAccount.getStatus()).isEqualTo(PaymentsMethodStatus.ACTIVE);
+    }
+
+    @Test
+    void 로컬에서_변경한_기본_결제수단은_재동기화해도_유지한다() {
+        BrandPayMethod localDefault = new BrandPayMethod(
+            member, "card-method-key", ProviderCode.CARD_KB,
+            "1111", PaymentType.CARD, true);
+        BrandPayMethod tossSelected = new BrandPayMethod(
+            member, "account-method-key", ProviderCode.BANK_SHINHAN,
+            "2222", PaymentType.ACCOUNT, false);
+        MethodsResponse response = new MethodsResponse(
+            true,
+            "account-id",
+            List.of(new Card(
+                "card-id", "card-method-key", "1111", "11", "ENABLED")),
+            List.of(new Account(
+                "account-id", "account-method-key", "2222", "88", "ENABLED"))
+        );
+        when(memberRepository.findByIdAndDeletedAtIsNull(1L))
+            .thenReturn(Optional.of(member));
+        when(brandPayMethodRepository.findAllByMemberId(1L))
+            .thenReturn(List.of(localDefault, tossSelected));
+
+        service.synchronize(1L, response);
+
+        assertThat(localDefault.getIsDefault()).isTrue();
+        assertThat(tossSelected.getIsDefault()).isFalse();
     }
 }

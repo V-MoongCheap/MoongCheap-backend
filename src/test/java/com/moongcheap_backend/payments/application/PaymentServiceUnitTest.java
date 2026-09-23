@@ -1,8 +1,11 @@
 package com.moongcheap_backend.payments.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.moongcheap_backend.common.exception.BusinessException;
+import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.member.domain.Member;
 import com.moongcheap_backend.order.domain.OrderStatus;
 import com.moongcheap_backend.order.domain.Orders;
@@ -57,6 +60,54 @@ class PaymentServiceUnitTest {
         service.deletePaymentMethod(1L, 10L);
         verify(methodClient).remove("token", "method", PaymentType.CARD, "key");
         assertThat(card.getStatus()).isEqualTo(PaymentsMethodStatus.EXPIRED);
+    }
+
+    @Test void 활성_결제수단을_기본으로_변경한다() {
+        Member member = Member.builder().loginId("member").nickname("member").build();
+        ReflectionTestUtils.setField(member, "id", 1L);
+        BrandPayMethod card = new BrandPayMethod(member, "method", ProviderCode.CARD_KB,
+            "1234", PaymentType.CARD, false);
+        ReflectionTestUtils.setField(card, "id", 10L);
+        when(methodRepository.findByIdAndMemberId(10L, 1L)).thenReturn(Optional.of(card));
+        when(methodRepository.markAsDefaultIfActive(
+            10L, 1L, PaymentsMethodStatus.ACTIVE)).thenReturn(1);
+
+        service.changeDefaultPaymentMethod(1L, 10L);
+
+        verify(methodRepository).unmarkDefaultExcept(1L, 10L);
+        verify(methodRepository).markAsDefaultIfActive(
+            10L, 1L, PaymentsMethodStatus.ACTIVE);
+    }
+
+    @Test void 만료된_결제수단은_기본으로_변경할_수_없다() {
+        Member member = Member.builder().loginId("member").nickname("member").build();
+        ReflectionTestUtils.setField(member, "id", 1L);
+        BrandPayMethod card = new BrandPayMethod(member, "method", ProviderCode.CARD_KB,
+            "1234", PaymentType.CARD, false);
+        ReflectionTestUtils.setField(card, "id", 10L);
+        card.expire();
+        when(methodRepository.findByIdAndMemberId(10L, 1L)).thenReturn(Optional.of(card));
+
+        assertThatThrownBy(() -> service.changeDefaultPaymentMethod(1L, 10L))
+            .isInstanceOf(BusinessException.class)
+            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.BRAND_PAY_METHOD_NOT_FOUND);
+
+        verify(methodRepository, never()).unmarkDefaultExcept(anyLong(), anyLong());
+        verify(methodRepository, never()).markAsDefaultIfActive(anyLong(), anyLong(), any());
+    }
+
+    @Test void 이미_기본인_결제수단을_다시_지정하면_변경하지_않는다() {
+        Member member = Member.builder().loginId("member").nickname("member").build();
+        ReflectionTestUtils.setField(member, "id", 1L);
+        BrandPayMethod card = new BrandPayMethod(member, "method", ProviderCode.CARD_KB,
+            "1234", PaymentType.CARD, true);
+        ReflectionTestUtils.setField(card, "id", 10L);
+        when(methodRepository.findByIdAndMemberId(10L, 1L)).thenReturn(Optional.of(card));
+
+        service.changeDefaultPaymentMethod(1L, 10L);
+
+        verify(methodRepository, never()).unmarkDefaultExcept(anyLong(), anyLong());
+        verify(methodRepository, never()).markAsDefaultIfActive(anyLong(), anyLong(), any());
     }
 
     @Test void 자동결제_호출은_외부청구없이_예약만_생성한다() {

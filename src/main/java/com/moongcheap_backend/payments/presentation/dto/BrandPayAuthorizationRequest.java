@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * 프론트엔드가 브랜드페이 SDK 인증을 완료한 뒤 백엔드에 전달하는 요청이다.
+ * 브랜드페이 SDK가 인증 콜백으로 전달한 값을 토큰 발급 서비스에 전달하는 요청이다.
  * 시크릿 키와 발급된 토큰은 프론트엔드에서 다루지 않는다.
  */
 public record BrandPayAuthorizationRequest(
