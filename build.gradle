@@ -62,6 +62,10 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+springBoot {
+    buildInfo()
+}
+
 tasks.named('test') {
     useJUnitPlatform()
     systemProperty 'user.timezone', 'Asia/Seoul'
