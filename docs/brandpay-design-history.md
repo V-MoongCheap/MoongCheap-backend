@@ -2,6 +2,8 @@
 
 작성일: 2026-09-22
 
+최근 갱신일: 2026-09-23
+
 이 문서는 이 채팅에서 제기한 질문, 설계 변경의 이유, 구현 결과와 미결정 사항을 정리한다. 대화에서 검토한 모든 구조가 구현되거나 최종 채택된 것은 아니다. 구현 현황은 작성 시점의 소스와 대조했다. 외부 API 규격은 대화 당시 확인한 내용을 기록한 것으로, 이 문서 작성 과정에서 새로 검증한 것은 아니다.
 
 ## 1. 전체 설계 흐름
@@ -316,6 +318,8 @@ DB 방식에도 폴링 인덱스, 만료 회수, 호출량 제한과 모니터�
 
 ## 15. 현재 구현과 제안의 경계
 
+아래 표는 2026-09-22 최초 정리 시점의 스냅샷이다. 이후 변경된 공동구매 판정·결제 연결 상태는 18~21절의 후속 기록을 우선한다.
+
 | 항목 | 작성 시점 상태 |
 | --- | --- |
 | 토큰 발급·암호화 저장·만료 확인·갱신 | 구현됨 |
@@ -352,6 +356,140 @@ DB 방식에도 폴링 인덱스, 만료 회수, 호출량 제한과 모니터�
 
 이전 구현 응답에서는 결제 모듈 테스트 통과를 보고했고, 전체 테스트 실행에서는 Redis 연결 실패로 contextLoads가 실패했다고 보고했다. 이는 당시 기록이며 현재 환경의 성공 여부를 뜻하지 않는다. 이 문서 작성에서는 결제 API 실행이나 전체 테스트를 재실행하지 않았다.
 
+## 18. 공동구매 주문 생성 Stream의 동작
+
+후속 대화에서는 공동구매 생성 이후 주문을 만드는 Redis Stream과 Consumer Group의 동작을 코드 단위로 확인했다.
+
+메시지가 Stream에서 Consumer Group으로 물리적으로 이동한 뒤 다시 Consumer에게 전달되는 구조는 아니다. 메시지 원본은 Redis Stream에 저장되고, Consumer Group은 그룹이 어디까지 읽었는지와 어떤 Consumer가 어떤 메시지를 처리 중인지 관리하는 논리적인 구독 단위다.
+
+```text
+Outbox Publisher
+  → Redis Stream에 XADD
+  → Consumer Group 기준으로 새 메시지 읽기
+  → 해당 Consumer의 Pending 목록(PEL)에 등록
+  → 주문 생성
+  → 성공하면 XACK
+  → Consumer Group의 PEL에서 제거
+```
+
+`XACK`은 Consumer Group의 Pending 상태만 제거한다. Stream에 저장된 원본 메시지를 삭제하지는 않는다. 원본 제거에는 별도의 삭제 또는 Stream trimming 정책이 필요하다.
+
+### 오래된 Pending 메시지 회수
+
+`GroupBuyOrderCreationStream.claimStale()`은 Pending 상태를 직접 해제하는 메서드가 아니다. 지정한 유휴 시간 이상 처리되지 않은 Pending 메시지를 최대 배치 크기까지 찾고, 그 소유권을 현재 Consumer로 이전해 재처리할 실제 메시지 목록을 반환한다.
+
+```text
+오래된 Pending 조회
+  → Pending 메시지에서 RecordId만 추출해 RecordId[] 생성
+  → claim(KEY, GROUP, consumerName, minimumIdleTime, recordIds)
+  → 현재 Consumer로 소유권 이전
+  → 회수된 메시지 목록 반환
+  → 재처리 성공 시 ACK
+```
+
+다음 코드는 메시지 본문 목록을 만드는 것이 아니라 **회수 대상 메시지 ID 배열**을 만든다.
+
+```java
+RecordId[] recordIds = pending.stream()
+    .map(message -> message.getId())
+    .toArray(RecordId[]::new);
+```
+
+이어지는 `claim()`은 이 ID에 해당하고 최소 유휴 시간을 만족하는 메시지의 소유권을 현재 Consumer로 변경하고, 재처리할 메시지 본문을 반환한다. Claim 뒤에도 메시지는 Pending이며, 유휴 시간과 전달 관련 메타데이터가 갱신된다. 최종적으로 `acknowledge()`가 성공해야 PEL에서 빠진다.
+
+현재 `GroupBuyOrderCreationConsumer`의 한 번의 실행 순서는 다음과 같다.
+
+1. 30초 이상 유휴 상태인 Pending 메시지를 최대 20개 회수해 처리한다.
+2. 새 메시지를 최대 20개 읽어 처리한다.
+3. `groupBuyId`가 없는 복구 불가능한 메시지는 로그를 남기고 ACK한다.
+4. 주문 생성이 커밋된 메시지는 ACK한다.
+5. 주문 생성에 실패한 메시지는 ACK하지 않아 Pending에 남기고, 다음 회수 주기에 재시도한다.
+
+스케줄은 `moongcheap.group-buy.order-consume-delay-ms` 설정을 사용하며 현재 기본 설정은 1,000ms다. Pending과 신규 조회에 각각 배치 크기 20이 적용되므로 둘 다 가득 찬 경우 한 번의 실행에서 최대 40건을 처리할 수 있다.
+
+## 19. Consumer Group 준비와 로컬 플래그
+
+`ensureConsumerGroup()`은 Redis에서 존재 여부를 별도 조회하는 메서드가 아니다. Consumer Group 생성을 시도하고, 이미 존재해 `BUSYGROUP` 오류가 발생하면 정상 상태로 받아들여 그룹이 준비되었음을 보장한다. 그룹 생성 시작 offset은 `0-0`이므로 그룹 생성 전에 Stream에 있던 메시지도 소비 대상에 포함한다.
+
+```java
+private final AtomicBoolean consumerGroupReady = new AtomicBoolean();
+```
+
+이 값은 Redis 상태가 아니라 현재 애플리케이션 인스턴스의 JVM 메모리에만 있는 캐시성 플래그다.
+
+| 값 | 의미 |
+| --- | --- |
+| `false` | 이 JVM이 아직 그룹 준비를 확인하지 않음 |
+| `true` | 그룹 생성 또는 기존 그룹 존재를 한 번 확인함 |
+
+`AtomicBoolean`과 동기화 블록은 한 인스턴스의 여러 스레드가 동시에 그룹 생성을 시도하는 것을 막는다. 서버가 여러 대면 인스턴스마다 별도의 플래그가 있다. 따라서 이 값은 Redis Consumer Group의 실제 존재 여부에 대한 영구적인 진실의 원천이 아니다.
+
+Redis 초기화 등으로 플래그는 `true`인데 실제 그룹이 사라질 수 있다. 실제 Stream 연산이 `NOGROUP`을 반환하면 `executeWithConsumerGroupRetry()`가 플래그를 `false`로 되돌리고 그룹을 다시 준비한 뒤 해당 연산을 한 번 재시도한다.
+
+## 20. 공동구매 판정 예약과 실행 순서
+
+공동구매 판정 예약은 Redis Stream이 아니라 Sorted Set을 사용한다. 전체 흐름은 다음과 같다.
+
+```text
+공동구매와 Outbox 이벤트를 같은 DB 트랜잭션으로 저장
+  → GroupBuyOutboxPublisher가 PENDING Outbox 조회
+  → 판정 예약 이벤트를 Redis Sorted Set에 등록
+  → GroupBuyJudgmentScheduler가 현재 시각까지 도래한 member 조회
+  → DB 행을 잠그고 성공/실패 판정
+  → 성사됐다면 DB 커밋 후 결제 예약 연결
+  → 완료한 판정 예약을 Sorted Set에서 제거
+```
+
+Sorted Set의 구성은 다음과 같다.
+
+| 항목 | 값 |
+| --- | --- |
+| key | `moongcheap:group-buy:judgment:pending` |
+| member | `groupBuyId` 문자열 |
+| score | 판정 예정 시각의 Epoch milliseconds |
+
+시간 객체나 시간의 밀리초 부분만 저장하는 것이 아니다. `LocalDateTime`을 `Asia/Seoul` 시간대로 해석하고 `Instant`로 바꾼 뒤, 1970-01-01T00:00:00Z부터 흐른 전체 밀리초 값으로 변환한다.
+
+```java
+dateTime.atZone(ZoneId.of("Asia/Seoul"))
+    .toInstant()
+    .toEpochMilli();
+```
+
+Redis ZSet의 score 형식에 맞춰 이 값은 `double`로 전달된다. 조회할 때 현재 시각도 같은 방식으로 바꿔 `score <= 현재 시각`인 member를 오래된 순서로 최대 100개 가져온다. 같은 `groupBuyId`를 다시 등록하면 ZSet member가 중복되지 않고 score만 갱신된다.
+
+현재 Outbox Publisher는 1초, 판정 Scheduler는 10초의 fixed delay 설정을 사용한다. fixed delay는 이전 실행이 끝난 후 설정된 시간이 지나면 다음 실행을 시작한다.
+
+판정 시 DB에서는 `OPEN` 상태이고 종료 시각이 지난 공동구매 행을 비관적 쓰기 잠금으로 조회한다. 참여 인원이 목표 이상이면 모집 완료, 미달이면 실패로 상태를 변경한다. 다른 워커가 이미 판정했거나 대상이 삭제되어 `GROUPBUY_NOT_FOUND`가 발생하면 오래된 Redis 예약을 제거한다. 일시적 DB 오류 등 다른 실패에서는 member를 남겨 다음 주기에 다시 시도한다.
+
+현재 소스는 대화 초반의 TODO 상태에서 더 진행됐다. 모집 성공이면 판정 트랜잭션이 반환되어 커밋된 후 `GroupPaymentReservationService.scheduleForGroup()`을 호출한다. 결제 예약 연결이 실패해도 이미 커밋된 판정을 되돌리지 않으며, 별도 복구 스케줄러가 보완하도록 로그를 남긴다.
+
+## 21. 클래스 이름과 마이그레이션 정리
+
+`GroupBuyJudgment` 접두사가 붙은 클래스 중 실제로 주문 생성 이벤트까지 함께 다루는 클래스가 있어 책임을 오해할 수 있다는 문제가 제기됐다. 이에 공용 Outbox 발행 클래스의 이름을 다음과 같이 변경했다.
+
+| 이전 이름 | 변경 이름 | 이유 |
+| --- | --- | --- |
+| `GroupBuyJudgmentOutboxPublisher` | `GroupBuyOutboxPublisher` | 판정 이벤트와 주문 생성 이벤트를 모두 주기적으로 발행 |
+| `GroupBuyJudgmentOutboxPublishService` | `GroupBuyOutboxPublishService` | 두 이벤트 유형을 분기해 서로 다른 Redis 자료구조에 발행 |
+
+반면 아래 클래스는 실제 판정 전용이므로 이름을 유지했다.
+
+- `GroupBuyJudgmentSchedule`: Redis ZSet 판정 예약 저장소
+- `GroupBuyJudgmentScheduler`: 도래한 판정 실행
+- `GroupBuyJudgmentService`: DB 공동구매 성공·실패 판정
+
+관련 프로덕션 코드와 단위 테스트의 클래스명·참조를 함께 변경했으며 당시 관련 테스트는 성공했다.
+
+Flyway 마이그레이션에는 `V12`가 두 개 존재했다. 기존 순서가 `V12__add_reject_history.sql`, `V13__product_award_evaluation_sequence.sql`이므로 주문 생성 Outbox 이벤트 타입을 추가하는 파일은 다음 빈 번호로 변경했다.
+
+```text
+V12__add_group_buy_order_creation_outbox_event.sql
+  → V14__add_group_buy_order_creation_outbox_event.sql
+```
+
+SQL 내용은 변경하지 않았고, 현재 마이그레이션 목록에서 해당 구간은 V11 → V12 → V13 → V14 순서다.
+
 ## 관련 코드
 
 - [PaymentService](../src/main/java/com/moongcheap_backend/payments/application/PaymentService.java): 현재 orderId 기준 자동결제 진입점.
@@ -363,3 +501,11 @@ DB 방식에도 폴링 인덱스, 만료 회수, 호출량 제한과 모니터�
 - [BrandPayTokenService](../src/main/java/com/moongcheap_backend/payments/application/BrandPayTokenService.java): 토큰 발급·갱신·사용.
 - [BrandPayIdempotencyKeyGenerator](../src/main/java/com/moongcheap_backend/payments/application/BrandPayIdempotencyKeyGenerator.java): 요청별 멱등키 생성.
 - [PaymentController](../src/main/java/com/moongcheap_backend/payments/presentation/PaymentController.java): 인증·동기화 및 결제수단 API.
+- [GroupBuyOrderCreationStream](../src/main/java/com/moongcheap_backend/groupbuy/infrastructure/GroupBuyOrderCreationStream.java): 주문 생성 Stream 발행, Pending 회수, ACK 및 Consumer Group 복구.
+- [GroupBuyOrderCreationConsumer](../src/main/java/com/moongcheap_backend/order/application/GroupBuyOrderCreationConsumer.java): 오래된 Pending과 신규 주문 생성 메시지 처리.
+- [GroupBuyOutboxPublisher](../src/main/java/com/moongcheap_backend/groupbuy/application/GroupBuyOutboxPublisher.java): 공동구매 Outbox 주기 실행 진입점.
+- [GroupBuyOutboxPublishService](../src/main/java/com/moongcheap_backend/groupbuy/application/GroupBuyOutboxPublishService.java): 이벤트 유형별 Stream·Sorted Set 발행.
+- [GroupBuyJudgmentSchedule](../src/main/java/com/moongcheap_backend/groupbuy/infrastructure/GroupBuyJudgmentSchedule.java): 판정 예정 시각을 Epoch 밀리초 score로 관리.
+- [GroupBuyJudgmentScheduler](../src/main/java/com/moongcheap_backend/groupbuy/application/GroupBuyJudgmentScheduler.java): 도래한 공동구매 판정 및 결제 예약 연결.
+- [GroupBuyJudgmentService](../src/main/java/com/moongcheap_backend/groupbuy/application/GroupBuyJudgmentService.java): 공동구매 성공·실패 판정 트랜잭션.
+- [V14 Outbox event migration](../src/main/resources/db/migration/V14__add_group_buy_order_creation_outbox_event.sql): 주문 생성 Outbox 이벤트 타입 허용.

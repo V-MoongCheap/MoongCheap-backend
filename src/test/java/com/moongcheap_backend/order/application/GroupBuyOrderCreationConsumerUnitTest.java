@@ -20,7 +20,7 @@ import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.RecordId;
 
 /**
- * 테스트 대상: {@link GroupBuyOrderCreationConsumer}의 주문 생성 및 Stream ACK 처리
+ * 테스트 대상: {@link GroupBuyOrderCreationConsumer}의 주문 생성 및 Stream ACK/삭제 처리
  */
 @ExtendWith(MockitoExtension.class)
 class GroupBuyOrderCreationConsumerUnitTest {
@@ -38,8 +38,8 @@ class GroupBuyOrderCreationConsumerUnitTest {
     private GroupBuyOrderCreationConsumer consumer;
 
     @Test
-    @DisplayName("해피 케이스 - 주문 생성 성공 후 메시지 ACK")
-    void 주문_생성이_성공하면_ACK한다() {
+    @DisplayName("해피 케이스 - 주문 생성 성공 후 메시지 ACK 및 삭제")
+    void 주문_생성이_성공하면_ACK_후_삭제한다() {
         when(orderCreationStream.claimStale(anyString(), anyInt(), any()))
             .thenReturn(List.of());
         when(orderCreationStream.readNewMessage(anyString(), anyInt()))
@@ -49,7 +49,7 @@ class GroupBuyOrderCreationConsumerUnitTest {
         consumer.consume();
 
         verify(orderService).autoCreateOrder(1L);
-        verify(orderCreationStream).acknowledge(record);
+        verify(orderCreationStream).acknowledgeAndDelete(record);
     }
 
     @Test
@@ -66,11 +66,11 @@ class GroupBuyOrderCreationConsumerUnitTest {
 
         consumer.consume();
 
-        verify(orderCreationStream, never()).acknowledge(record);
+        verify(orderCreationStream, never()).acknowledgeAndDelete(record);
     }
 
     @Test
-    @DisplayName("예외 케이스 - 잘못된 메시지는 주문 없이 ACK")
+    @DisplayName("예외 케이스 - 잘못된 메시지는 주문 없이 ACK 및 삭제")
     void 필수값이_없는_메시지는_폐기한다() {
         when(record.getId()).thenReturn(RecordId.of("1000000000000-0"));
         when(orderCreationStream.claimStale(anyString(), anyInt(), any()))
@@ -83,6 +83,6 @@ class GroupBuyOrderCreationConsumerUnitTest {
         consumer.consume();
 
         verify(orderService, never()).autoCreateOrder(any());
-        verify(orderCreationStream).acknowledge(record);
+        verify(orderCreationStream).acknowledgeAndDelete(record);
     }
 }

@@ -21,7 +21,17 @@ public class PaymentWorker {
     public void runOne() {
         var candidate = schedule.claimDue();
         if (candidate.isEmpty()) return;
-        var begun = executionService.begin(candidate.get());
+        runNow(candidate.get());
+    }
+
+    /**
+     * 지정한 결제를 기존 워커와 동일한 실행 경로로 한 번 처리한다.
+     * 로컬 테스트 콘솔처럼 이미 paymentId를 알고 있는 호출자가 Redis 폴링을
+     * 기다리지 않고 검증할 때 사용하며, 상태 획득과 완료 반영은 기존 트랜잭션
+     * 서비스가 담당한다.
+     */
+    void runNow(Long paymentId) {
+        var begun = executionService.begin(paymentId);
         if (begun.isEmpty()) return;
         var work = begun.get();
         try {

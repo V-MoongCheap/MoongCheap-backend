@@ -38,6 +38,13 @@ http://localhost:8080/api/dev/brandpay-test/callback
 5. 최초 인증 리다이렉트의 `code`, `customerKey`를 백엔드에 전달한다.
 6. 백엔드가 Access Token을 발급하고 토스 결제수단을 DB에 동기화한다.
 7. 서버에 저장된 결제수단 목록을 화면에 표시한다.
+8. 활성 결제수단을 선택해 `PAYMENT_PENDING` 테스트 주문을 생성한다.
+9. 생성된 주문 ID로 자동결제를 즉시 실행한다.
+
+자동결제 테스트는 Toss API를 직접 우회 호출하지 않는다. 먼저 기존 서비스로
+`Payments`와 Outbox를 생성한 다음 운영 `PaymentWorker`와 동일한 실행 경로를 한 번
+동기적으로 수행한다. 주문은 공동구매 판정 완료, `PAYMENT_PENDING`, 로그인 회원 소유,
+활성 BrandPay 결제수단 지정 조건을 만족해야 한다.
 
 백엔드 콜백은 처리를 마치면 `204 No Content`를 반환한다. 정적 프론트 서버로 다시
 HTTP 리다이렉트하지 않으므로 `python -m http.server`가 지원하지 않는 `OPTIONS`
