@@ -93,6 +93,29 @@ public class PaymentService {
         brandPayMethodRepository.saveAndFlush(paymentMethod);
     }
 
+    /**
+     * 회원이 소유한 활성 결제수단을 로컬 기본 자동결제 수단으로 변경한다.
+     * 이미 기본인 수단을 다시 지정하는 요청은 성공으로 처리한다.
+     */
+    @Transactional
+    public void changeDefaultPaymentMethod(Long memberId, Long paymentMethodId) {
+        BrandPayMethod paymentMethod = brandPayMethodRepository
+            .findByIdAndMemberId(paymentMethodId, memberId)
+            .filter(method -> method.getStatus() == PaymentsMethodStatus.ACTIVE)
+            .orElseThrow(() -> new BusinessException(ErrorCode.BRAND_PAY_METHOD_NOT_FOUND));
+
+        if (paymentMethod.getIsDefault()) {
+            return;
+        }
+
+        brandPayMethodRepository.unmarkDefaultExcept(memberId, paymentMethodId);
+        int updated = brandPayMethodRepository.markAsDefaultIfActive(
+            paymentMethodId, memberId, PaymentsMethodStatus.ACTIVE);
+        if (updated == 0) {
+            throw new BusinessException(ErrorCode.BRAND_PAY_METHOD_NOT_FOUND);
+        }
+    }
+
     public Long scheduleAutomaticPayment(Long orderId) {
         return paymentPreparationService.schedule(orderId);
     }

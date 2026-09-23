@@ -38,7 +38,7 @@ public class BrandPayTokenService {
      * 브랜드페이 SDK 인증 결과를 토스페이먼츠 토큰으로 교환해 저장한다.
      *
      * @param memberId 인증된 서비스 회원 ID
-     * @param request SDK 인증 완료 후 프론트엔드가 전달한 customerKey와 code
+     * @param request SDK 인증 콜백이 전달한 customerKey와 code
      */
     public void issue(Long memberId, BrandPayAuthorizationRequest request) {
         // 요청한 회원과 해당 회원에게 발급된 CustomerKey가 실제로 존재하는지 확인한다.
