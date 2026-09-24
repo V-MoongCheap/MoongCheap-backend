@@ -1,8 +1,11 @@
 package com.moongcheap_backend.common.config;
 
 import java.util.concurrent.TimeUnit;
+import org.apache.hc.client5.http.auth.AuthScope;
+import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
 import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManager;
 import org.apache.hc.client5.http.impl.nio.PoolingAsyncClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.HttpHost;
@@ -27,6 +30,12 @@ public class OpenSearchConfig {
     @Value("${opensearch.scheme:http}")
     private String scheme;
 
+    @Value("${opensearch.username:}")
+    private String username;
+
+    @Value("${opensearch.password:}")
+    private String password;
+
     @Bean(destroyMethod = "close")
     public PoolingAsyncClientConnectionManager connectionManager() {
         ConnectionConfig connectionConfig = ConnectionConfig.custom()
@@ -48,11 +57,16 @@ public class OpenSearchConfig {
             .setResponseTimeout(5, TimeUnit.SECONDS)
             .build();
         HttpHost httpHost = new HttpHost(scheme, host, port);
+        BasicCredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+        credentialsProvider.setCredentials(
+            new AuthScope(httpHost),
+            new UsernamePasswordCredentials(username, password.toCharArray()));
         OpenSearchTransport transport = ApacheHttpClient5TransportBuilder
             .builder(httpHost)
             .setHttpClientConfigCallback(builder -> builder
                 .setConnectionManager(connectionManager)
-                .setDefaultRequestConfig(requestConfig))
+                .setDefaultRequestConfig(requestConfig)
+                .setDefaultCredentialsProvider(credentialsProvider))
             .setMapper(new JacksonJsonpMapper())
             .build();
         return new OpenSearchClient(transport);
