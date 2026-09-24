@@ -40,7 +40,7 @@ moongcheap:
     redirect-base-url: "http://localhost:3000"
   security:
     encryption:
-      password: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      password: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" # gitleaks:allow -- local-only dummy key
       salt: "0123456789abcdef0123456789abcdef"
   oauth2:
     kakao:
