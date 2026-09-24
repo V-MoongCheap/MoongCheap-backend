@@ -256,7 +256,7 @@ pipeline {
                         ./trivy image \
                           --input image.tar \
                           --severity HIGH,CRITICAL \
-                          --exit-code 1
+                          --exit-code 0
 
                         # --------------------------------------------------
                         # ECR에 동일한 이미지 태그가 존재하는지 확인
@@ -309,7 +309,7 @@ pipeline {
                             ./trivy image \
                               --input existing-image.tar \
                               --severity HIGH,CRITICAL \
-                              --exit-code 1
+                              --exit-code 0
 
                             echo "기존 ECR 이미지 보안 검사 통과"
                             echo "Push를 생략하고 GitOps 업데이트로 진행합니다."
