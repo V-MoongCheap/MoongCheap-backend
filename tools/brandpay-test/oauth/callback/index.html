@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>로그인 완료</title></head>
+<body>
+<script>
+  const incomplete = new URLSearchParams(location.search).get("status") === "incomplete";
+  sessionStorage.setItem("brandpay.callbackMessage", incomplete
+    ? "소셜 가입 약관 동의가 완료되지 않아 결제 API를 사용할 수 없습니다."
+    : "로그인이 완료됐습니다. BrandPay 연결을 다시 확인합니다.");
+  location.replace("/");
+</script>
+</body>
+</html>
