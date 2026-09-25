@@ -66,6 +66,13 @@ springBoot {
     buildInfo()
 }
 
+tasks.named('processResources') {
+    from('tools/brandpay-test') {
+        include 'index.html', 'app.js', 'styles.css'
+        into 'static/brandpay-test'
+    }
+}
+
 tasks.named('test') {
     useJUnitPlatform()
     systemProperty 'user.timezone', 'Asia/Seoul'
