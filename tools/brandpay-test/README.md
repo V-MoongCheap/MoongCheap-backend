@@ -62,31 +62,22 @@ HTTP 리다이렉트하지 않으므로 `python -m http.server`가 지원하지 
 
 ## 배포 환경에서 임시 사용
 
-기존 서비스 주소와 루트를 덮어쓰지 않도록 테스트 콘솔은 별도 서브도메인에 배포한다.
+테스트 콘솔의 HTML/CSS/JavaScript는 백엔드 빌드 시 JAR의
+`static/brandpay-test` 경로에 함께 포함된다. 별도 프론트 서버나 DNS 없이 다음 주소로
+접속한다.
 
 ```text
-프론트:       https://moongcheap.shop
-API:          https://api.moongcheap.shop
-테스트 콘솔:  https://brandpay-test.moongcheap.shop
+https://api.moongcheap.shop/brandpay-test/
 ```
 
-각 주소는 호스트가 다르므로 서로 충돌하지 않는다. 백엔드는 테스트 콘솔 Origin을
-credential CORS 허용 목록에 정확히 추가해야 한다.
-
-```text
-ALLOWED_ORIGINS=https://moongcheap.shop,https://brandpay-test.moongcheap.shop
-```
-
-배포된 콘솔은 API 기본 주소로 `https://api.moongcheap.shop`을 사용하고 redirectUrl로
-다음 운영 콜백을 사용한다.
+페이지와 정적 자산에는 백엔드의 기본 인증 규칙이 적용된다. 먼저 기존 프론트에서
+로그인한 뒤 위 주소로 접속한다. 같은 API Origin에서 실행되므로 테스트 콘솔을 위한
+별도 CORS Origin은 필요하지 않다. 배포된 콘솔은 다음 운영 콜백을 사용한다.
 
 ```text
 https://api.moongcheap.shop/api/payments/brandpay/callback
 ```
 
 OAuth 로그인 완료 후에는 기존 프론트의 `/oauth/callback`으로 이동한다. 로그인 세션은
-API 도메인에 유지되므로 테스트 콘솔로 다시 돌아와 `세션 확인`을 누른다.
-
-테스트 콘솔 자체도 사내 IP, VPN, Basic Auth 등의 배포 계층 접근 제한을 적용하고 데이터
-준비가 끝나면 제거한다. `moongcheap.shop`의 루트에 콘솔을 배포하면 기존 프론트를
-덮어쓸 수 있으므로 사용하지 않는다.
+API 도메인에 유지되므로 테스트 콘솔 주소로 다시 이동한다. 테스트 데이터 준비가 끝나면
+빌드 포함 설정과 진입 컨트롤러를 제거한다.
