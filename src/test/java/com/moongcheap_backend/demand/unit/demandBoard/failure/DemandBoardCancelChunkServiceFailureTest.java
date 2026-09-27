@@ -54,7 +54,7 @@ class DemandBoardCancelChunkServiceFailureTest {
             List<DemandBoard> boards = List.of(boardWithId(10L), boardWithId(20L));
             when(advisoryLockAdaptor.tryAcquireXactLock(AdvisoryLockKeys.DEMAND_BOARD_CANCEL_BATCH))
                 .thenReturn(true);
-            when(demandBoardRepository.findOverdueGatheringChunk(threshold, 1000))
+            when(demandBoardRepository.findOverdueGatheringChunk(1000))
                 .thenReturn(boards);
             when(productRepository.findProductIdsGroupedByBoardId(
                 eq(List.of(10L, 20L)), eq(ProductStatus.BIDDING))).thenReturn(java.util.Map.of());
@@ -72,7 +72,7 @@ class DemandBoardCancelChunkServiceFailureTest {
             List<DemandBoard> boards = List.of(boardWithId(10L), boardWithId(20L));
             when(advisoryLockAdaptor.tryAcquireXactLock(AdvisoryLockKeys.DEMAND_BOARD_CANCEL_BATCH))
                 .thenReturn(true);
-            when(demandBoardRepository.findOverdueGatheringChunk(threshold, 1000))
+            when(demandBoardRepository.findOverdueGatheringChunk(1000))
                 .thenReturn(boards);
             when(productRepository.findProductIdsGroupedByBoardId(
                 eq(List.of(10L, 20L)), eq(ProductStatus.BIDDING)))
@@ -94,7 +94,7 @@ class DemandBoardCancelChunkServiceFailureTest {
             List<DemandBoard> boards = List.of(boardWithId(10L));
             when(advisoryLockAdaptor.tryAcquireXactLock(AdvisoryLockKeys.DEMAND_BOARD_CANCEL_BATCH))
                 .thenReturn(true);
-            when(demandBoardRepository.findOverdueGatheringChunk(threshold, 1000))
+            when(demandBoardRepository.findOverdueGatheringChunk(1000))
                 .thenReturn(boards);
             when(productRepository.findProductIdsGroupedByBoardId(
                 eq(List.of(10L)), eq(ProductStatus.BIDDING)))

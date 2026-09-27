@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.moongcheap_backend.common.exception.BusinessException;
@@ -15,10 +16,12 @@ import com.moongcheap_backend.groupbuy.infrastructure.GroupBuyRepository;
 import com.moongcheap_backend.member.domain.Seller;
 import com.moongcheap_backend.product.domain.product.Product;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -75,6 +78,25 @@ class GroupBuyJudgmentServiceUnitTest {
             .isInstanceOf(BusinessException.class)
             .extracting(exception -> ((BusinessException) exception).getErrorCode())
             .isEqualTo(ErrorCode.GROUPBUY_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("시간 기준 - 공동구매 마감은 KST 벽시각으로 조회")
+    void 공동구매_판정_조회는_KST_현재시각을_사용한다() {
+        Long groupBuyId = 1L;
+        LocalDateTime before = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+        when(groupBuyRepository.findExpiredByIdForJudgment(
+            eq(groupBuyId), eq(GroupBuyStatus.OPEN), any(LocalDateTime.class)))
+            .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> groupBuyJudgmentService.judgeAndPay(groupBuyId))
+            .isInstanceOf(BusinessException.class);
+
+        ArgumentCaptor<LocalDateTime> nowCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(groupBuyRepository).findExpiredByIdForJudgment(
+            eq(groupBuyId), eq(GroupBuyStatus.OPEN), nowCaptor.capture());
+        assertThat(nowCaptor.getValue()).isBetween(
+            before, LocalDateTime.now(ZoneId.of("Asia/Seoul")));
     }
 
     private GroupBuy createGroupBuy(int targetCount, int count, LocalDateTime endAt) {

@@ -4,12 +4,13 @@ import com.moongcheap_backend.groupbuy.domain.GroupBuy;
 import com.moongcheap_backend.groupbuy.domain.GroupBuyStatus;
 import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
-import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -34,6 +35,21 @@ public interface GroupBuyRepository extends JpaRepository<GroupBuy, Long> {
         @Param("groupBuyId") Long groupBuyId,
         @Param("status") GroupBuyStatus status,
         @Param("now") LocalDateTime now
+    );
+
+    // 판정 예정시각에서 복구 유예시간까지 지났지만 여전히 OPEN인 후보만 조회한다.
+    // 실제 Redis 유실 여부는 조회 후 ZSCORE 존재 여부로 한 번 더 판별한다.
+    @Query("""
+        select gb
+        from GroupBuy gb
+        where gb.status = :status
+          and gb.groupBuyEndAt <= :cutoff
+        order by gb.groupBuyEndAt, gb.id
+        """)
+    List<GroupBuy> findDueForJudgmentRecovery(
+        @Param("status") GroupBuyStatus status,
+        @Param("cutoff") LocalDateTime cutoff,
+        Pageable pageable
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
