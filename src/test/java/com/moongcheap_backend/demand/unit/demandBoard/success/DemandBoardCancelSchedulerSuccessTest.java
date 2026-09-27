@@ -1,5 +1,6 @@
 package com.moongcheap_backend.demand.unit.demandBoard.success;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
@@ -8,11 +9,14 @@ import static org.mockito.Mockito.when;
 
 import com.moongcheap_backend.demand.application.demandBoard.DemandBoardCancelChunkService;
 import com.moongcheap_backend.demand.application.demandBoard.DemandBoardCancelScheduler;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,6 +44,22 @@ class DemandBoardCancelSchedulerSuccessTest {
             scheduler.cancelOverdueGatheringBoards();
 
             verify(chunkService, times(1)).cancelChunk(any(), eq(CHUNK_SIZE));
+        }
+
+        @Test
+        void 배치_처리시각은_KST_현재시각을_사용한다() {
+            ZoneId zoneSeoul = ZoneId.of("Asia/Seoul");
+            LocalDateTime before = LocalDateTime.now(zoneSeoul);
+            when(chunkService.cancelChunk(any(), eq(CHUNK_SIZE)))
+                .thenReturn(Optional.of(0));
+
+            scheduler.cancelOverdueGatheringBoards();
+
+            ArgumentCaptor<LocalDateTime> thresholdCaptor =
+                ArgumentCaptor.forClass(LocalDateTime.class);
+            verify(chunkService).cancelChunk(thresholdCaptor.capture(), eq(CHUNK_SIZE));
+            assertThat(thresholdCaptor.getValue()).isBetween(
+                before, LocalDateTime.now(zoneSeoul));
         }
 
         @Test

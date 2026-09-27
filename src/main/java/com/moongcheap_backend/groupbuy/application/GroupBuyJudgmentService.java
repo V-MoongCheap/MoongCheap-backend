@@ -6,6 +6,7 @@ import com.moongcheap_backend.groupbuy.domain.GroupBuy;
 import com.moongcheap_backend.groupbuy.domain.GroupBuyStatus;
 import com.moongcheap_backend.groupbuy.infrastructure.GroupBuyRepository;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class GroupBuyJudgmentService {
+
+    private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
 
     private final GroupBuyRepository groupBuyRepository;
 
@@ -30,7 +33,8 @@ public class GroupBuyJudgmentService {
 
     // 저장소가 OPEN이면서 판정 시각이 지난 행만 반환하므로 결과는 성공/실패 둘 중 하나다.
     private boolean judge(Long groupBuyId) {
-        LocalDateTime now = LocalDateTime.now();
+        // group_buy_end_at은 TIMESTAMP에 KST 벽시각으로 저장된다.
+        LocalDateTime now = LocalDateTime.now(ZONE_SEOUL);
         GroupBuy groupBuy = groupBuyRepository.findExpiredByIdForJudgment(
                 groupBuyId, GroupBuyStatus.OPEN, now)
             .orElseThrow(() -> new BusinessException(ErrorCode.GROUPBUY_NOT_FOUND));

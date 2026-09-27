@@ -32,8 +32,8 @@ public class DemandBoardCancelChunkService {
         if (!advisoryLockAdaptor.tryAcquireXactLock(AdvisoryLockKeys.DEMAND_BOARD_CANCEL_BATCH)) {
             return Optional.empty();
         }
-        List<DemandBoard> chunks = demandBoardRepository.findOverdueGatheringChunk(threshold,
-            chunkSize);
+        // 마감 여부는 저장소가 DB 현재시각으로 판단하고, threshold는 상태 변경시각으로만 쓴다.
+        List<DemandBoard> chunks = demandBoardRepository.findOverdueGatheringChunk(chunkSize);
         if (chunks.isEmpty()) {
             return Optional.of(0);
         }

@@ -54,14 +54,14 @@ public interface DemandBoardRepository extends JpaRepository<DemandBoard, Long> 
     Optional<DemandBoard> findByIdAndStatusInForUpdate(@Param("id") Long id,
         @Param("statuses") Collection<DemandBoardStatus> statuses);
 
+    // TIMESTAMPTZ 마감값은 DB 현재시각과 직접 비교해 JVM/DB 시간대 변환 오차를 피한다.
     @Query(value = """
         SELECT * FROM demand_board
-         WHERE status = 'GB_GATHERING' AND sale_end_at < :threshold
+         WHERE status = 'GB_GATHERING' AND sale_end_at < CURRENT_TIMESTAMP
          LIMIT :chunkSize
          FOR UPDATE SKIP LOCKED
         """, nativeQuery = true)
     List<DemandBoard> findOverdueGatheringChunk(
-        @Param("threshold") LocalDateTime threshold,
         @Param("chunkSize") int chunkSize);
 
 

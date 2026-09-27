@@ -43,13 +43,15 @@ public interface DemandRepository extends JpaRepository<Demand, Long> {
     boolean existsByMemberIdAndDemandBoardIdAndStatusIn(
         Long memberId, Long demandBoardId, Collection<DemandStatus> statuses);
 
+    // TIMESTAMPTZ 마감값은 DB 현재시각과 직접 비교해 JVM/DB 시간대 변환 오차를 피한다.
     @Modifying
     @Query(value = """
         UPDATE demand
            SET status = 'EXPIRED', updated_at = :threshold
          WHERE id IN (
              SELECT id FROM demand
-              WHERE status IN ('UNASSIGNED','SUBSTITUTE_OFFERED') AND desire_end_at < :threshold
+              WHERE status IN ('UNASSIGNED','SUBSTITUTE_OFFERED')
+                AND desire_end_at < CURRENT_TIMESTAMP
               LIMIT :chunkSize
               FOR UPDATE SKIP LOCKED
          )

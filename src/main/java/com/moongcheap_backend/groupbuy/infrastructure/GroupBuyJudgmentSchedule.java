@@ -33,6 +33,11 @@ public class GroupBuyJudgmentSchedule {
         return due == null ? Set.of() : due;
     }
 
+    // null이면 해당 공동구매의 판정 예약이 Sorted Set에서 유실된 상태다.
+    public Double score(Long groupBuyId) {
+        return redisTemplate.opsForZSet().score(KEY, groupBuyId.toString());
+    }
+
     // DB 판정이 커밋된 대상만 대기열에서 제거한다.
     public void remove(Long groupBuyId) {
         redisTemplate.opsForZSet().remove(KEY, groupBuyId.toString());
