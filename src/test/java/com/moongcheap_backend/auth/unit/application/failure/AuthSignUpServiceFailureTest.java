@@ -37,7 +37,7 @@ class AuthSignUpServiceFailureTest {
 
         @Test
         void 비밀번호와_비밀번호_확인이_다른_값으로_회원가입을_요청한다() {
-            SignUpRequestDto dto = new SignUpRequestDto("user1234", "pass1234!", "different!", "닉네임", "test@example.com");
+            SignUpRequestDto dto = new SignUpRequestDto("user1234", "pass1234!", "different!", "닉네임", "test@example.com", true, true, true);
 
             assertThatThrownBy(() -> authSignUpService.signUp(dto))
                 .isInstanceOf(BusinessException.class)
@@ -47,7 +47,7 @@ class AuthSignUpServiceFailureTest {
 
         @Test
         void 이미_사용_중인_아이디로_회원가입을_요청한다() {
-            SignUpRequestDto dto = new SignUpRequestDto("user1234", "pass1234!", "pass1234!", "닉네임", "test@example.com");
+            SignUpRequestDto dto = new SignUpRequestDto("user1234", "pass1234!", "pass1234!", "닉네임", "test@example.com", true, true, true);
             when(memberRepository.existsByLoginIdAndDeletedAtIsNull("user1234")).thenReturn(true);
 
             assertThatThrownBy(() -> authSignUpService.signUp(dto))
@@ -58,7 +58,7 @@ class AuthSignUpServiceFailureTest {
 
         @Test
         void 동시에_동일한_아이디로_회원가입을_요청한다() {
-            SignUpRequestDto dto = new SignUpRequestDto("user1234", "pass1234!", "pass1234!", "닉네임", "test@example.com");
+            SignUpRequestDto dto = new SignUpRequestDto("user1234", "pass1234!", "pass1234!", "닉네임", "test@example.com", true, true, true);
             when(memberRepository.existsByLoginIdAndDeletedAtIsNull("user1234")).thenReturn(false);
             when(memberRepository.save(any(Member.class))).thenThrow(DataIntegrityViolationException.class);
 
