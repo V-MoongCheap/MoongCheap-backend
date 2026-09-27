@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardQueryRepository;
 import com.moongcheap_backend.product.application.product.ProductService;
 import com.moongcheap_backend.product.domain.productCatalog.ProductCatalog;
 import com.moongcheap_backend.product.infrastructure.productCatalog.ProductCatalogRepository;
@@ -28,6 +29,7 @@ class ProductServiceSuccessTest {
 
     @Mock private ProductCatalogSearchRepository productSearchRepository;
     @Mock private ProductCatalogRepository productCatalogRepository;
+    @Mock private DemandBoardQueryRepository demandBoardQueryRepository;
 
     @InjectMocks
     private ProductService service;
@@ -92,6 +94,8 @@ class ProductServiceSuccessTest {
             int size = 2;
             when(productSearchRepository.searchByName("키워드", page * size, size + 1))
                 .thenReturn(List.of(document(1L), document(2L), document(3L)));
+            when(demandBoardQueryRepository.getCatalogDemandSummaries(anyList()))
+                .thenReturn(List.of());
 
             ProductSearchResponse result = service.search("키워드", page, size);
 
@@ -106,6 +110,8 @@ class ProductServiceSuccessTest {
             int size = 5;
             when(productSearchRepository.searchByName("키워드", page * size, size + 1))
                 .thenReturn(List.of(document(1L), document(2L)));
+            when(demandBoardQueryRepository.getCatalogDemandSummaries(anyList()))
+                .thenReturn(List.of());
 
             ProductSearchResponse result = service.search("키워드", page, size);
 

@@ -4,6 +4,8 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
+import com.moongcheap_backend.demand.infrastructure.demandBoard.CatalogDemandSummaryRow;
+import com.moongcheap_backend.demand.infrastructure.demandBoard.DemandBoardQueryRepository;
 import com.moongcheap_backend.product.domain.productCatalog.ProductCatalog;
 import com.moongcheap_backend.product.infrastructure.productCatalog.ProductCatalogRepository;
 import com.moongcheap_backend.product.infrastructure.productSearch.ProductCatalogSearchRepository;
@@ -11,7 +13,9 @@ import com.moongcheap_backend.product.infrastructure.productSearch.ProductSearch
 import com.moongcheap_backend.product.presentation.productSearch.dto.ProductSearchResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +27,7 @@ public class ProductService {
 
     private final ProductCatalogSearchRepository productSearchRepository;
     private final ProductCatalogRepository productCatalogRepository;
+    private final DemandBoardQueryRepository demandBoardQueryRepository;
 
     public void index(Long catalogId) throws IOException {
         var catalog = productCatalogRepository.findById(catalogId)
@@ -53,6 +58,10 @@ public class ProductService {
         int from = page * size;
         List<ProductSearchDocument> docs =
             productSearchRepository.searchByName(keyword, from, size + 1);
-        return ProductSearchResponse.of(docs, page, size);
+        List<Long> catalogIds = docs.stream().map(ProductSearchDocument::id).toList();
+        Map<Long, CatalogDemandSummaryRow> summariesByCatalogId = demandBoardQueryRepository
+            .getCatalogDemandSummaries(catalogIds).stream()
+            .collect(Collectors.toMap(CatalogDemandSummaryRow::catalogId, Function.identity()));
+        return ProductSearchResponse.of(docs, summariesByCatalogId, page, size);
     }
 }

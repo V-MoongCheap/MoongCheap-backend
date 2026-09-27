@@ -203,6 +203,8 @@ class DemandBoardServiceSuccessTest {
                 "thumb.png",
                 10000,
                 3000,
+                8000,
+                12000,
                 "판매자",
                 1,
                 5,
