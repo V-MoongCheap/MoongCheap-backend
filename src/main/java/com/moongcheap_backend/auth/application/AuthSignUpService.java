@@ -43,13 +43,15 @@ public class AuthSignUpService {
         if (memberRepository.existsByLoginIdAndDeletedAtIsNull(loginId)) {
             throw new BusinessException(ErrorCode.LOGIN_ID_DUPLICATED);
         }
+        Member newMember = Member.builder()
+                .loginId(loginId)
+                .nickname(NicknameValidator.toKey(nickname))
+                .email(request.email())
+                .build();
+        newMember.agreeTerms();
         Member member;
         try {
-            member = memberRepository.save(Member.builder()
-                    .loginId(loginId)
-                    .nickname(NicknameValidator.toKey(nickname))
-                    .email(request.email())
-                    .build());
+            member = memberRepository.save(newMember);
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException(ErrorCode.CONCURRENT_SIGNUP_CONFLICT);
         }
