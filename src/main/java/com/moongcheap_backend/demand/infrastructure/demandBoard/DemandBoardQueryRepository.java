@@ -21,4 +21,6 @@ public interface DemandBoardQueryRepository {
     Optional<AuctionResultRow> getAuctionResult(Long demandBoardId, Long memberId);
 
     List<AwardingPendingResponseDto.Board> getPendingAwardingBoards(int fetchSize);
+
+    List<CatalogDemandSummaryRow> getCatalogDemandSummaries(List<Long> catalogIds);
 }

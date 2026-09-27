@@ -342,4 +342,53 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
     ) {
 
     }
+
+    // 검색 결과 카드에 얹을 카탈로그별 수요보드 요약. 활성 상태(GB_GATHERING, GB_ACTION_REQUIRED)만 집계.
+    // - quick_deal_count : 카탈로그에 걸린 활성 수요보드 수
+    // - latest_*         : 가장 최근에 생성된 활성 보드(id DESC)의 상태/마감/참여자 수
+    private static final String CATALOG_DEMAND_SUMMARIES_QUERY = """
+        SELECT
+            pc.id AS catalog_id,
+            COALESCE(agg.quick_deal_count, 0) AS quick_deal_count,
+            latest.status                     AS latest_demand_board_status,
+            latest.sale_end_at                AS latest_sale_end_at,
+            latest.participant_count          AS latest_participant_count
+        FROM product_catalog pc
+        LEFT JOIN LATERAL (
+            SELECT COUNT(*) AS quick_deal_count
+            FROM demand_board db
+            WHERE db.catalog_id = pc.id
+              AND db.status IN ('GB_GATHERING', 'GB_ACTION_REQUIRED')
+        ) agg ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT db.status, db.sale_end_at, db.participant_count
+            FROM demand_board db
+            WHERE db.catalog_id = pc.id
+              AND db.status IN ('GB_GATHERING', 'GB_ACTION_REQUIRED')
+            ORDER BY db.id DESC
+            LIMIT 1
+        ) latest ON TRUE
+        WHERE pc.id IN (:catalogIds)
+        """;
+
+    private static final RowMapper<CatalogDemandSummaryRow> CATALOG_DEMAND_SUMMARY_MAPPER =
+        (rs, rowNum) -> new CatalogDemandSummaryRow(
+            rs.getLong("catalog_id"),
+            rs.getInt("quick_deal_count"),
+            rs.getString("latest_demand_board_status"),
+            JdbcTimeMapper.toLocalDateTime(rs, "latest_sale_end_at"),
+            rs.getObject("latest_participant_count", Integer.class)
+        );
+
+    @Override
+    public List<CatalogDemandSummaryRow> getCatalogDemandSummaries(List<Long> catalogIds) {
+        if (catalogIds == null || catalogIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbcTemplate.query(
+            CATALOG_DEMAND_SUMMARIES_QUERY,
+            new MapSqlParameterSource("catalogIds", catalogIds),
+            CATALOG_DEMAND_SUMMARY_MAPPER
+        );
+    }
 }
