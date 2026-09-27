@@ -131,13 +131,25 @@ public class DemandBoardService {
             row.catalogThumbnailUrl(),
             row.unitPrice(),
             row.shippingFee(),
+            row.desiredPriceMin(),
+            row.desiredPriceMax(),
+            calculateExpectedPaymentAmount(row.unitPrice(), row.quantity(), row.shippingFee()),
             row.sellerName(),
             row.quantity(),
             row.participantCount(),
             row.totalParticipantQuantity(),
+            row.judgedAt(),
             calculatePaymentDeadline(row.judgedAt()),
             row.awardReason()
         );
+    }
+
+    // 배송비 포함 예상 결제 금액. 낙찰 전이면 unitPrice/shippingFee가 null일 수 있어 null 안전 처리.
+    private static Integer calculateExpectedPaymentAmount(Integer unitPrice, Integer quantity, Integer shippingFee) {
+        if (unitPrice == null || quantity == null || shippingFee == null) {
+            return null;
+        }
+        return Math.addExact(Math.multiplyExact(unitPrice, quantity), shippingFee);
     }
 
     public LocalDateTime calculatePaymentDeadline(LocalDateTime judgedAt) {

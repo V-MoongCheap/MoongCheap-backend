@@ -163,6 +163,8 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
         SELECT
             d.status,
             d.quantity,
+            d.desired_price_min,
+            d.desired_price_max,
             db.participant_count,
             db.judged_at,
             pc.name             AS catalog_name,
@@ -207,6 +209,8 @@ public class DemandBoardQueryRepositoryImpl implements DemandBoardQueryRepositor
             rs.getString("thumbnail_url"),
             rs.getObject("unit_price", Integer.class),
             rs.getObject("shipping_fee", Integer.class),
+            rs.getObject("desired_price_min", Integer.class),
+            rs.getObject("desired_price_max", Integer.class),
             rs.getString("seller_name"),
             rs.getObject("quantity", Integer.class),
             rs.getObject("participant_count", Integer.class),

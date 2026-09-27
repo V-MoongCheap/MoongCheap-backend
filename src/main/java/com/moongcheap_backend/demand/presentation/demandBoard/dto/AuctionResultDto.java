@@ -9,10 +9,14 @@ public record AuctionResultDto(
     String thumbnail_url,
     Integer unitPrice,
     Integer shippingFee,
+    Integer desiredPriceMin,
+    Integer desiredPriceMax,
+    Integer expectedPaymentAmount,
     String sellerName,
     Integer quantity,
     Integer participantCount,
     Long totalParticipantQuantity,
+    LocalDateTime awardedAt,
     LocalDateTime paymentDeadlineAt,
     String awardReason
 ) {
