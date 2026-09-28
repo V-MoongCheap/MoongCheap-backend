@@ -115,11 +115,10 @@ class OrderServiceUnitTest {
         org.springframework.test.util.ReflectionTestUtils.setField(
             order, "createdAt", LocalDateTime.of(2026, 9, 26, 12, 0));
         Pageable pageable = PageRequest.of(0, 20);
-        when(ordersRepository.findAllByMemberIdAndOrderStatusIn(
-            MEMBER_ID, Set.of(OrderStatus.PAYMENT_COMPLETED), pageable))
+        when(ordersRepository.findAllByMemberId(MEMBER_ID, pageable))
             .thenReturn(new PageImpl<>(List.of(order)));
 
-        var response = orderService.viewOrderList(MEMBER_ID, OrderListTab.PAYMENT_COMPLETED, pageable);
+        var response = orderService.viewOrderList(MEMBER_ID, OrderListTab.ALL, pageable);
 
         assertThat(response.getContent().getFirst().totalAmount()).isEqualTo(7500);
     }
@@ -541,38 +540,56 @@ class OrderServiceUnitTest {
         }
 
         @Test
-        void 결제완료_탭은_회원의_결제완료_주문을_조회한다() {
-            when(ordersRepository.findAllByMemberIdAndOrderStatusIn(
-                MEMBER_ID, Set.of(OrderStatus.PAYMENT_COMPLETED), pageable))
+        void 전체_탭은_회원의_모든_주문을_조회한다() {
+            when(ordersRepository.findAllByMemberId(MEMBER_ID, pageable))
                 .thenReturn(new PageImpl<>(List.of(order)));
 
             Page<OrderListResponse> result =
-                orderService.viewOrderList(MEMBER_ID, OrderListTab.PAYMENT_COMPLETED, pageable);
+                orderService.viewOrderList(MEMBER_ID, OrderListTab.ALL, pageable);
 
             assertOrderListResponse(result.getContent().getFirst());
             verify(orderMemberInfoService).validateActiveMember(MEMBER_ID);
         }
 
-        @ParameterizedTest
-        @CsvSource({
-            "PAYMENT_COMPLETED, PAYMENT_COMPLETED",
-            "PREPARING_SHIPMENT, PREPARING_SHIPMENT",
-            "SHIPPED, SHIPPED",
-            "DELIVERED, DELIVERED"
-        })
-        void 개별_진행상태_탭은_해당_상태만_조회한다(OrderListTab tab, OrderStatus status) {
-            Set<OrderStatus> statuses = Set.of(status);
-            when(order.getOrderStatus()).thenReturn(status);
+        @Test
+        void 진행중_탭은_진행중인_네가지_상태를_조회한다() {
+            Set<OrderStatus> statuses = Set.of(
+                OrderStatus.PAYMENT_PENDING,
+                OrderStatus.PAYMENT_COMPLETED,
+                OrderStatus.PREPARING_SHIPMENT,
+                OrderStatus.SHIPPED
+            );
             when(ordersRepository.findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, pageable))
                 .thenReturn(new PageImpl<>(List.of(order)));
 
             Page<OrderListResponse> result =
-                orderService.viewOrderList(MEMBER_ID, tab, pageable);
+                orderService.viewOrderList(MEMBER_ID, OrderListTab.IN_PROGRESS, pageable);
 
-            assertThat(result.getContent()).hasSize(1);
-            assertThat(result.getContent().getFirst().orderStatus()).isEqualTo(status);
-            verify(ordersRepository).findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, pageable);
-            verify(orderMemberInfoService).validateActiveMember(MEMBER_ID);
+            assertOrderListResponse(result.getContent().getFirst());
+        }
+
+        @Test
+        void 배송완료_탭은_배송완료_상태를_조회한다() {
+            Set<OrderStatus> statuses = Set.of(OrderStatus.DELIVERED);
+            when(ordersRepository.findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, pageable))
+                .thenReturn(new PageImpl<>(List.of(order)));
+
+            Page<OrderListResponse> result =
+                orderService.viewOrderList(MEMBER_ID, OrderListTab.DELIVERED, pageable);
+
+            assertOrderListResponse(result.getContent().getFirst());
+        }
+
+        @Test
+        void 구매확정_탭은_구매확정_상태를_조회한다() {
+            Set<OrderStatus> statuses = Set.of(OrderStatus.COMPLEDED);
+            when(ordersRepository.findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, pageable))
+                .thenReturn(new PageImpl<>(List.of(order)));
+
+            Page<OrderListResponse> result =
+                orderService.viewOrderList(MEMBER_ID, OrderListTab.COMPLETED, pageable);
+
+            assertOrderListResponse(result.getContent().getFirst());
         }
 
         @Test
@@ -585,16 +602,15 @@ class OrderServiceUnitTest {
             List<Orders> secondPageOrders = IntStream.rangeClosed(21, 25)
                 .mapToObj(this::createOrder)
                 .toList();
-            Set<OrderStatus> statuses = Set.of(OrderStatus.PAYMENT_COMPLETED);
-            when(ordersRepository.findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, firstPageable))
+            when(ordersRepository.findAllByMemberId(MEMBER_ID, firstPageable))
                 .thenReturn(new PageImpl<>(firstPageOrders, firstPageable, 25));
-            when(ordersRepository.findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, secondPageable))
+            when(ordersRepository.findAllByMemberId(MEMBER_ID, secondPageable))
                 .thenReturn(new PageImpl<>(secondPageOrders, secondPageable, 25));
 
             Page<OrderListResponse> firstPage =
-                orderService.viewOrderList(MEMBER_ID, OrderListTab.PAYMENT_COMPLETED, firstPageable);
+                orderService.viewOrderList(MEMBER_ID, OrderListTab.ALL, firstPageable);
             Page<OrderListResponse> secondPage =
-                orderService.viewOrderList(MEMBER_ID, OrderListTab.PAYMENT_COMPLETED, secondPageable);
+                orderService.viewOrderList(MEMBER_ID, OrderListTab.ALL, secondPageable);
 
             assertThat(firstPage.getNumber()).isZero();
             assertThat(firstPage.getNumberOfElements()).isEqualTo(20);
@@ -610,8 +626,8 @@ class OrderServiceUnitTest {
             assertThat(secondPage.isFirst()).isFalse();
             assertThat(secondPage.isLast()).isTrue();
 
-            verify(ordersRepository).findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, firstPageable);
-            verify(ordersRepository).findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, secondPageable);
+            verify(ordersRepository).findAllByMemberId(MEMBER_ID, firstPageable);
+            verify(ordersRepository).findAllByMemberId(MEMBER_ID, secondPageable);
         }
 
         private Orders createOrder(int index) {
