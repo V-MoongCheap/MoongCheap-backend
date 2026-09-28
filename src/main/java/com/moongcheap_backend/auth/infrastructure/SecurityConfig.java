@@ -1,6 +1,7 @@
 package com.moongcheap_backend.auth.infrastructure;
 
 import com.moongcheap_backend.auth.infrastructure.oauth.CustomOAuth2UserService;
+import com.moongcheap_backend.auth.infrastructure.oauth.GoogleOfflineAccessAuthorizationRequestResolver;
 import com.moongcheap_backend.auth.infrastructure.oauth.OAuth2LoginFailureHandler;
 import com.moongcheap_backend.auth.infrastructure.oauth.OAuth2LoginSuccessHandler;
 import com.moongcheap_backend.common.exception.ErrorCode;
@@ -34,6 +35,7 @@ public class SecurityConfig {
     private final IncompleteSignupFilter incompleteSignupFilter;
     private final InternalApiKeyFilter internalApiKeyFilter;
     private final CorsConfigurationSource corsConfigurationSource;
+    private final GoogleOfflineAccessAuthorizationRequestResolver googleOfflineAccessResolver;
     @Lazy
     private final List<RequestMappingHandlerMapping> requestMappingHandlerMappings;
 
@@ -92,6 +94,8 @@ public class SecurityConfig {
                     HttpServletResponse.SC_FORBIDDEN, ErrorCode.FORBIDDEN))
             )
             .oauth2Login(o -> o
+                .authorizationEndpoint(a -> a
+                    .authorizationRequestResolver(googleOfflineAccessResolver))
                 .userInfoEndpoint(u -> u.userService(oauth2UserService))
                 .successHandler(oauth2LoginSuccessHandler)
                 .failureHandler(oauth2LoginFailureHandler)

@@ -35,14 +35,23 @@ public class SocialCredential {
     @Column(name = "provider_id", nullable = false, length = 255)
     private String providerId;
 
+    @Column(name = "refresh_token_enc", columnDefinition = "TEXT")
+    private String refreshTokenEnc;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false, nullable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    private SocialCredential(Long memberId, SocialProvider provider, String providerId) {
+    private SocialCredential(Long memberId, SocialProvider provider, String providerId,
+        String refreshTokenEnc) {
         this.memberId = memberId;
         this.provider = provider;
         this.providerId = providerId;
+        this.refreshTokenEnc = refreshTokenEnc;
+    }
+
+    public void updateRefreshToken(String refreshTokenEnc) {
+        this.refreshTokenEnc = refreshTokenEnc;
     }
 }

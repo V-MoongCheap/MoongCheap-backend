@@ -216,7 +216,7 @@ class DemandServiceFailureTest {
 
             assertThatThrownBy(() -> service.rejectOffer(1L, 100L))
                 .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DEMAND_ACCEPT_NOT_ALLOWED);
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DEMAND_REJECT_NOT_ALLOWED);
         }
 
         @Test
@@ -243,7 +243,7 @@ class DemandServiceFailureTest {
 
             assertThatThrownBy(() -> service.rejectOffer(1L, 100L))
                 .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DEMAND_ACCEPT_NOT_ALLOWED);
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DEMAND_REJECT_NOT_ALLOWED);
         }
     }
 }
