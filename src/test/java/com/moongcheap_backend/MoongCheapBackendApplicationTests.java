@@ -41,7 +41,7 @@ class MoongCheapBackendApplicationTests extends AbstractIntegrationTest {
                     INSERT INTO payments VALUES (5, 'PENDING'), (6, 'UNKNOWN');
                     """);
                 var script = new ClassPathResource(
-                    "db/migration/V23__include_delivery_fee_in_unpaid_orders.sql");
+                    "db/migration/V24__include_delivery_fee_in_unpaid_orders.sql");
                 ScriptUtils.executeSqlScript(connection, script);
                 ScriptUtils.executeSqlScript(connection, script);
                 try (var rows = statement.executeQuery("SELECT total_amount FROM orders ORDER BY id")) {
