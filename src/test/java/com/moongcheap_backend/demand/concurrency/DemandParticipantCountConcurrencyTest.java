@@ -73,10 +73,12 @@ class DemandParticipantCountConcurrencyTest extends AbstractConcurrencyTest {
         int cancelCount = 20;
         int threadCount = acceptCount + cancelCount;
         Long catalogId = productCatalogFixture.save("우유", 3000).getId();
+        // ASSIGNED 수요 20건과 초기 참여 인원을 맞춘다. 부족하면 취소가 먼저 실행될 때
+        // 인원이 0에 도달하여 감소가 생략되므로 실행 순서에 따라 테스트가 실패한다.
         DemandBoard board = demandFixture.saveBoard(catalogId,
-            DemandBoardStatus.GB_GATHERING, 2, LocalDateTime.now().plusDays(3));
+            DemandBoardStatus.GB_GATHERING, cancelCount, LocalDateTime.now().plusDays(3));
 
-        // 초기 participant_count = 2 (accept 대상은 SUBSTITUTE_OFFERED, cancel 대상은 ASSIGNED)
+        // SUBSTITUTE_OFFERED는 참여 인원에 포함하지 않고 ASSIGNED만 포함한다.
         List<Long> acceptMembers = new ArrayList<>();
         List<Long> cancelMembers = new ArrayList<>();
         List<Long> demandIds = new ArrayList<>();
@@ -110,7 +112,7 @@ class DemandParticipantCountConcurrencyTest extends AbstractConcurrencyTest {
             }
         });
 
-        // 성공한 accept 수와 실제 board.participantCount 정합성 검증
+        // 수락·취소가 모두 성공하고 실제 참여 인원도 일치하는지 검증한다.
         long acceptSuccessCount = demandIds.subList(0, acceptCount).stream()
             .map(id -> demandRepository.findById(id).orElseThrow())
             .filter(d -> d.getStatus() == DemandStatus.ASSIGNED)
@@ -121,7 +123,11 @@ class DemandParticipantCountConcurrencyTest extends AbstractConcurrencyTest {
             .count();
 
         DemandBoard boardRefreshed = demandBoardRepository.findById(board.getId()).orElseThrow();
-        int expected = (int) (2 + acceptSuccessCount - cancelSuccessCount);
+        assertThat(result.success()).isEqualTo(threadCount);
+        assertThat(result.failure()).isZero();
+        assertThat(acceptSuccessCount).isEqualTo(acceptCount);
+        assertThat(cancelSuccessCount).isEqualTo(cancelCount);
+        int expected = (int) (cancelCount + acceptSuccessCount - cancelSuccessCount);
         assertThat(boardRefreshed.getParticipantCount()).isEqualTo(expected);
         assertThat(result.total()).isEqualTo(threadCount);
     }
