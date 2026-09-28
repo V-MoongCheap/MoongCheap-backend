@@ -69,7 +69,7 @@ public class Demand extends BaseTimeEntity {
         this.status = DemandStatus.CANCELED;
     }
 
-    @Builder
+    @Builder(builderClassName = "DefaultBuilder")
     private Demand(Long memberId, Long catalogId, Long payMethodId, Integer desiredPriceMin,
         Integer desiredPriceMax,
         LocalDateTime desireEndAt, Integer quantity, String extraRequirement,
@@ -86,7 +86,7 @@ public class Demand extends BaseTimeEntity {
         this.isSubstitutable = isSubstitutable;
     }
 
-    @Builder(builderMethodName = "boardJoinBuilder")
+    @Builder(builderMethodName = "boardJoinBuilder", builderClassName = "BoardJoinBuilder")
     private Demand(Long memberId, Long catalogId, Long demandBoardId, Long payMethodId,
         Integer desiredPriceMin, Integer desiredPriceMax, LocalDateTime desireEndAt,
         Integer quantity, boolean isSubstitutable, String extraRequirement) {
@@ -94,6 +94,7 @@ public class Demand extends BaseTimeEntity {
         this.catalogId = catalogId;
         this.demandBoardId = demandBoardId;
         this.payMethodId = payMethodId;
+
         this.desiredPriceMin = desiredPriceMin;
         this.desiredPriceMax = desiredPriceMax;
         this.desireEndAt = desireEndAt;
