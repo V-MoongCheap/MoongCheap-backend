@@ -552,9 +552,8 @@ class OrderServiceUnitTest {
         }
 
         @Test
-        void 진행중_탭은_진행중인_네가지_상태를_조회한다() {
+        void 진행중_탭은_결제대기를_제외한_세가지_상태를_조회한다() {
             Set<OrderStatus> statuses = Set.of(
-                OrderStatus.PAYMENT_PENDING,
                 OrderStatus.PAYMENT_COMPLETED,
                 OrderStatus.PREPARING_SHIPMENT,
                 OrderStatus.SHIPPED
@@ -566,6 +565,7 @@ class OrderServiceUnitTest {
                 orderService.viewOrderList(MEMBER_ID, OrderListTab.IN_PROGRESS, pageable);
 
             assertOrderListResponse(result.getContent().getFirst());
+            verify(ordersRepository).findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, pageable);
         }
 
         @Test
