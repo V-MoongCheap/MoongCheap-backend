@@ -177,11 +177,7 @@ public class DemandService {
 
     @Transactional
     public void acceptOffer(Long memberId, Long demandId) {
-        Demand demand = demandRepository.findByIdAndStatusForUpdate(
-                demandId,
-                memberId,
-                DemandStatus.SUBSTITUTE_OFFERED)
-            .orElseThrow(() -> new BusinessException(ErrorCode.DEMAND_NOT_FOUND));
+        Demand demand = findByIdAndStatusForUpdate(demandId, memberId);
         if (demand.getDesireEndAt().isBefore(LocalDateTime.now())) {
             throw new BusinessException(ErrorCode.DEMAND_DESIRE_EXPIRED);
         }
@@ -199,11 +195,7 @@ public class DemandService {
 
     @Transactional
     public void rejectOffer(Long memberId, Long demandId) {
-        Demand demand = demandRepository.findByIdAndStatusForUpdate(
-                demandId,
-                memberId,
-                DemandStatus.SUBSTITUTE_OFFERED)
-            .orElseThrow(() -> new BusinessException(ErrorCode.DEMAND_NOT_FOUND));
+        Demand demand = findByIdAndStatusForUpdate(demandId, memberId);
         if (demand.getDesireEndAt().isBefore(LocalDateTime.now())) {
             throw new BusinessException(ErrorCode.DEMAND_DESIRE_EXPIRED);
         }
@@ -212,6 +204,17 @@ public class DemandService {
         }
         rejectHistoryRepository.save(RejectHistory.of(demand.getId(), demand.getDemandBoardId()));
         demand.rejectOffer();
+    }
+
+    private Demand findByIdAndStatusForUpdate(Long demandId, Long memberId) {
+        Demand demand = demandRepository.findByIdAndMemberIdForUpdate(
+                demandId,
+                memberId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.DEMAND_NOT_FOUND));
+        if (!demand.getStatus().equals(DemandStatus.SUBSTITUTE_OFFERED)) {
+            throw new BusinessException(ErrorCode.DEMAND_ACCEPT_NOT_ALLOWED);
+        }
+        return demand;
     }
 
 }

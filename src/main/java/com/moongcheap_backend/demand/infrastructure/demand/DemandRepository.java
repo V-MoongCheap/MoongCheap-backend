@@ -37,6 +37,13 @@ public interface DemandRepository extends JpaRepository<Demand, Long> {
         @Param("memberId") Long memberId,
         @Param("status") DemandStatus status);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT d FROM Demand d "
+        + "WHERE d.id = :id AND d.memberId = :memberId")
+    Optional<Demand> findByIdAndMemberIdForUpdate(
+        @Param("id") Long id,
+        @Param("memberId") Long memberId);
+
     boolean existsByMemberIdAndCatalogIdAndStatusIn(
         Long memberId, Long catalogId, Collection<DemandStatus> statuses);
 
