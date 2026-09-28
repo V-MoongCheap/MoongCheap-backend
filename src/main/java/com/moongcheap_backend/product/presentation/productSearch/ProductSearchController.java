@@ -9,9 +9,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/products-search")
 @RequiredArgsConstructor
+@Validated
 public class ProductSearchController {
 
     private final ProductService productService;
@@ -55,7 +58,7 @@ public class ProductSearchController {
     @Operation(summary = "상품 검색", description = "상품명/규격 검색. page/size 페이지네이션 지원 (기본 size=20).")
     @GetMapping("/search")
     public ResponseEntity<ProductSearchResponse> search(
-        @RequestParam String q,
+        @RequestParam @NotBlank String q,
         @RequestParam(defaultValue = "0") @Min(0) int page,
         @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) throws IOException {

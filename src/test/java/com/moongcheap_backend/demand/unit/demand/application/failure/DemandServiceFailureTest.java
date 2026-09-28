@@ -165,21 +165,22 @@ class DemandServiceFailureTest {
 
         @Test
         void SUBSTITUTE_OFFERED_상태가_아닌_수요의_제안을_수락한다() {
-            when(demandRepository.findByIdAndStatusForUpdate(100L, 1L,
-                DemandStatus.SUBSTITUTE_OFFERED))
-                .thenReturn(Optional.empty());
+            Demand demand = mock(Demand.class);
+            when(demand.getStatus()).thenReturn(DemandStatus.UNASSIGNED);
+            when(demandRepository.findByIdAndMemberIdForUpdate(100L, 1L))
+                .thenReturn(Optional.of(demand));
 
             assertThatThrownBy(() -> service.acceptOffer(1L, 100L))
                 .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DEMAND_NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DEMAND_ACCEPT_NOT_ALLOWED);
         }
 
         @Test
         void 만료_기한이_지난_수요의_제안을_수락한다() {
             Demand demand = mock(Demand.class);
+            when(demand.getStatus()).thenReturn(DemandStatus.SUBSTITUTE_OFFERED);
             when(demand.getDesireEndAt()).thenReturn(LocalDateTime.now().minusDays(1));
-            when(demandRepository.findByIdAndStatusForUpdate(100L, 1L,
-                DemandStatus.SUBSTITUTE_OFFERED))
+            when(demandRepository.findByIdAndMemberIdForUpdate(100L, 1L))
                 .thenReturn(Optional.of(demand));
 
             assertThatThrownBy(() -> service.acceptOffer(1L, 100L))
@@ -190,10 +191,10 @@ class DemandServiceFailureTest {
         @Test
         void demandBoardId가_없는_수요의_제안을_수락한다() {
             Demand demand = mock(Demand.class);
+            when(demand.getStatus()).thenReturn(DemandStatus.SUBSTITUTE_OFFERED);
             when(demand.getDesireEndAt()).thenReturn(LocalDateTime.now().plusDays(1));
             when(demand.getDemandBoardId()).thenReturn(null);
-            when(demandRepository.findByIdAndStatusForUpdate(100L, 1L,
-                DemandStatus.SUBSTITUTE_OFFERED))
+            when(demandRepository.findByIdAndMemberIdForUpdate(100L, 1L))
                 .thenReturn(Optional.of(demand));
 
             assertThatThrownBy(() -> service.acceptOffer(1L, 100L))
@@ -208,21 +209,22 @@ class DemandServiceFailureTest {
 
         @Test
         void SUBSTITUTE_OFFERED_상태가_아닌_수요의_제안을_거절한다() {
-            when(demandRepository.findByIdAndStatusForUpdate(100L, 1L,
-                DemandStatus.SUBSTITUTE_OFFERED))
-                .thenReturn(Optional.empty());
+            Demand demand = mock(Demand.class);
+            when(demand.getStatus()).thenReturn(DemandStatus.UNASSIGNED);
+            when(demandRepository.findByIdAndMemberIdForUpdate(100L, 1L))
+                .thenReturn(Optional.of(demand));
 
             assertThatThrownBy(() -> service.rejectOffer(1L, 100L))
                 .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DEMAND_NOT_FOUND);
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DEMAND_ACCEPT_NOT_ALLOWED);
         }
 
         @Test
         void 만료_기한이_지난_수요의_제안을_거절한다() {
             Demand demand = mock(Demand.class);
+            when(demand.getStatus()).thenReturn(DemandStatus.SUBSTITUTE_OFFERED);
             when(demand.getDesireEndAt()).thenReturn(LocalDateTime.now().minusDays(1));
-            when(demandRepository.findByIdAndStatusForUpdate(100L, 1L,
-                DemandStatus.SUBSTITUTE_OFFERED))
+            when(demandRepository.findByIdAndMemberIdForUpdate(100L, 1L))
                 .thenReturn(Optional.of(demand));
 
             assertThatThrownBy(() -> service.rejectOffer(1L, 100L))
@@ -233,10 +235,10 @@ class DemandServiceFailureTest {
         @Test
         void demandBoardId가_없는_수요의_제안을_거절한다() {
             Demand demand = mock(Demand.class);
+            when(demand.getStatus()).thenReturn(DemandStatus.SUBSTITUTE_OFFERED);
             when(demand.getDesireEndAt()).thenReturn(LocalDateTime.now().plusDays(1));
             when(demand.getDemandBoardId()).thenReturn(null);
-            when(demandRepository.findByIdAndStatusForUpdate(100L, 1L,
-                DemandStatus.SUBSTITUTE_OFFERED))
+            when(demandRepository.findByIdAndMemberIdForUpdate(100L, 1L))
                 .thenReturn(Optional.of(demand));
 
             assertThatThrownBy(() -> service.rejectOffer(1L, 100L))

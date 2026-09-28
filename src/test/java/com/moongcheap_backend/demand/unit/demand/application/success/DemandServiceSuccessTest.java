@@ -237,10 +237,10 @@ class DemandServiceSuccessTest {
             Long demandId = 100L;
             Long boardId = 200L;
             Demand demand = mock(Demand.class);
+            when(demand.getStatus()).thenReturn(DemandStatus.SUBSTITUTE_OFFERED);
             when(demand.getDesireEndAt()).thenReturn(LocalDateTime.now().plusDays(1));
             when(demand.getDemandBoardId()).thenReturn(boardId);
-            when(demandRepository.findByIdAndStatusForUpdate(
-                demandId, memberId, DemandStatus.SUBSTITUTE_OFFERED))
+            when(demandRepository.findByIdAndMemberIdForUpdate(demandId, memberId))
                 .thenReturn(Optional.of(demand));
             when(demandBoardRepository.increaseParticipantCountIfActive(
                 boardId, DemandBoardStatus.GB_GATHERING)).thenReturn(1);
@@ -257,10 +257,10 @@ class DemandServiceSuccessTest {
             Long demandId = 100L;
             Long boardId = 200L;
             Demand demand = mock(Demand.class);
+            when(demand.getStatus()).thenReturn(DemandStatus.SUBSTITUTE_OFFERED);
             when(demand.getDesireEndAt()).thenReturn(LocalDateTime.now().plusDays(1));
             when(demand.getDemandBoardId()).thenReturn(boardId);
-            when(demandRepository.findByIdAndStatusForUpdate(
-                demandId, memberId, DemandStatus.SUBSTITUTE_OFFERED))
+            when(demandRepository.findByIdAndMemberIdForUpdate(demandId, memberId))
                 .thenReturn(Optional.of(demand));
             when(demandBoardRepository.increaseParticipantCountIfActive(
                 boardId, DemandBoardStatus.GB_GATHERING)).thenReturn(0);
@@ -283,10 +283,10 @@ class DemandServiceSuccessTest {
             Long boardId = 200L;
             Demand demand = mock(Demand.class);
             when(demand.getId()).thenReturn(demandId);
+            when(demand.getStatus()).thenReturn(DemandStatus.SUBSTITUTE_OFFERED);
             when(demand.getDesireEndAt()).thenReturn(LocalDateTime.now().plusDays(1));
             when(demand.getDemandBoardId()).thenReturn(boardId);
-            when(demandRepository.findByIdAndStatusForUpdate(
-                demandId, memberId, DemandStatus.SUBSTITUTE_OFFERED))
+            when(demandRepository.findByIdAndMemberIdForUpdate(demandId, memberId))
                 .thenReturn(Optional.of(demand));
 
             service.rejectOffer(memberId, demandId);
