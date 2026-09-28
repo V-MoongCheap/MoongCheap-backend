@@ -3,6 +3,7 @@ package com.moongcheap_backend.payments.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import com.moongcheap_backend.common.outbox.domain.*;
+import com.moongcheap_backend.demand.application.demand.OrderDemandService;
 import com.moongcheap_backend.common.outbox.infrastructure.OutboxEventRepository;
 import com.moongcheap_backend.groupbuy.domain.*;
 import com.moongcheap_backend.member.domain.Member;
@@ -22,7 +23,8 @@ class PaymentExecutionServiceUnitTest {
     PaymentsRepository payments = mock(PaymentsRepository.class);
     OutboxEventRepository outbox = mock(OutboxEventRepository.class);
     PaymentQueueProperties properties = new PaymentQueueProperties();
-    PaymentExecutionService service = new PaymentExecutionService(orders, payments, outbox, properties);
+    OrderDemandService demands = mock(OrderDemandService.class);
+    PaymentExecutionService service = new PaymentExecutionService(orders, payments, outbox, properties, demands);
     Payments payment;
     OutboxEvent event;
 
@@ -68,16 +70,27 @@ class PaymentExecutionServiceUnitTest {
             "pk", "order-100", "상품", 7500, "DONE", OffsetDateTime.now()));
         assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.UNKNOWN);
         assertThat(payment.getOrders().getOrderStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        verifyNoInteractions(demands);
         assertThat(payment.getProcessingToken()).isEqualTo(execution.processingToken());
     }
 
-    @Test void 현재_토큰은_결제와_주문을_함께_완료하고_Outbox를_요청한다() {
+    @Test void 현재_토큰은_결제와_주문과_수요를_함께_완료하고_Outbox를_요청한다() {
         var execution = service.begin(200L).orElseThrow();
         service.complete(200L, execution.processingToken(),
             new BrandPayPaymentClient.AutomaticPaymentResponse("pk", "order-100", "상품",
                 7500, "DONE", OffsetDateTime.parse("2026-09-22T09:00:00+09:00")));
         assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.SUCCEEDED);
         assertThat(payment.getOrders().getOrderStatus()).isEqualTo(OrderStatus.PAYMENT_COMPLETED);
+        verify(demands).closeAfterPayment(10L);
         assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
+    }
+
+    @Test void 승인금액이_다르면_수요를_종료하지_않는다() {
+        var execution = service.begin(200L).orElseThrow();
+        service.complete(200L, execution.processingToken(),
+            new BrandPayPaymentClient.AutomaticPaymentResponse("pk", "order-100", "상품",
+                4500, "DONE", OffsetDateTime.now()));
+        assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.REVIEW_REQUIRED);
+        verifyNoInteractions(demands);
     }
 }

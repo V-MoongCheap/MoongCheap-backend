@@ -15,6 +15,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface DemandRepository extends JpaRepository<Demand, Long> {
 
+    // 이미 종료·취소된 수요는 지연된 결제 응답으로 덮어쓰지 않는다.
+    @Modifying
+    @Query("UPDATE Demand d SET d.status = :closed, d.updatedAt = :now "
+        + "WHERE d.id = :id AND d.status = :pending")
+    int closeAfterPayment(@Param("id") Long id,
+        @Param("pending") DemandStatus pending, @Param("closed") DemandStatus closed,
+        @Param("now") LocalDateTime now);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<Demand> findAllByDemandBoardIdAndStatus(
         Long demandBoardId,
