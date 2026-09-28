@@ -155,7 +155,8 @@ public class Orders extends BaseTimeEntity {
         order.sum = quantity;
         order.price = price;
         order.deliveryFee = deliveryFee;
-        order.totalAmount = Math.multiplyExact(price, quantity);
+        // 배송비는 수량과 무관하게 주문당 1회 부과한다. 조회와 자동결제가 이 총액을 공유한다.
+        order.totalAmount = Math.addExact(Math.multiplyExact(price, quantity), deliveryFee);
         order.sellerId = sellerId;
         order.businessName = businessName;
         return order;

@@ -34,9 +34,9 @@ class PaymentExecutionServiceUnitTest {
         GroupBuy group = new GroupBuy(null, null, "상품", 1, 1,
             LocalDateTime.now(), GroupBuyStatus.RECRUITMENT_COMPLETED);
         Orders order = Orders.create("order-100", 10L, 1L, method, group,
-            1L, "상품", "img", 2, 10000, 0, 1L, "판매자");
+            1L, "상품", "img", 1, 4500, 3000, 1L, "판매자");
         ReflectionTestUtils.setField(order, "id", 100L);
-        payment = Payments.readyBrandPay(order, "order-100", "상품", 20000, PaymentsMethod.CARD);
+        payment = Payments.readyBrandPay(order, "order-100", "상품", order.getTotalAmount(), PaymentsMethod.CARD);
         payment.schedule(method, "customer", "same-key");
         ReflectionTestUtils.setField(payment, "id", 200L);
         ReflectionTestUtils.setField(payment, "createdAt",
@@ -56,6 +56,7 @@ class PaymentExecutionServiceUnitTest {
         var execution = service.begin(200L).orElseThrow();
         assertThat(execution.idempotencyKey()).isEqualTo("same-key");
         assertThat(execution.reconciliation()).isFalse();
+        assertThat(execution.request().amount()).isEqualTo(7500);
         assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.UNKNOWN);
         assertThat(payment.getAttemptCount()).isEqualTo(1);
         assertThat(payment.getProcessingToken()).isEqualTo(execution.processingToken());
@@ -64,7 +65,7 @@ class PaymentExecutionServiceUnitTest {
     @Test void 오래된_토큰은_성공결과를_반영하지_못한다() {
         var execution = service.begin(200L).orElseThrow();
         service.complete(200L, UUID.randomUUID(), new BrandPayPaymentClient.AutomaticPaymentResponse(
-            "pk", "order-100", "상품", 20000, "DONE", OffsetDateTime.now()));
+            "pk", "order-100", "상품", 7500, "DONE", OffsetDateTime.now()));
         assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.UNKNOWN);
         assertThat(payment.getOrders().getOrderStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
         assertThat(payment.getProcessingToken()).isEqualTo(execution.processingToken());
@@ -74,7 +75,7 @@ class PaymentExecutionServiceUnitTest {
         var execution = service.begin(200L).orElseThrow();
         service.complete(200L, execution.processingToken(),
             new BrandPayPaymentClient.AutomaticPaymentResponse("pk", "order-100", "상품",
-                20000, "DONE", OffsetDateTime.parse("2026-09-22T09:00:00+09:00")));
+                7500, "DONE", OffsetDateTime.parse("2026-09-22T09:00:00+09:00")));
         assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.SUCCEEDED);
         assertThat(payment.getOrders().getOrderStatus()).isEqualTo(OrderStatus.PAYMENT_COMPLETED);
         assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PENDING);

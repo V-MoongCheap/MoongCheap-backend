@@ -33,7 +33,7 @@ class PaymentPreparationServiceUnitTest {
         GroupBuy group = new GroupBuy(null, null, "상품", 1, 1,
             LocalDateTime.now(), GroupBuyStatus.RECRUITMENT_COMPLETED);
         Orders order = Orders.create("order-100", 10L, 1L, method, group,
-            1L, "상품", "img", 2, 10000, 0, 1L, "판매자");
+            1L, "상품", "img", 1, 4500, 3000, 1L, "판매자");
         ReflectionTestUtils.setField(order, "id", 100L);
         when(orders.findByIdForPaymentUpdate(100L)).thenReturn(Optional.of(order));
         when(payments.findFirstByOrdersIdOrderByIdDesc(100L)).thenReturn(Optional.empty());
@@ -50,6 +50,7 @@ class PaymentPreparationServiceUnitTest {
         var payment = org.mockito.ArgumentCaptor.forClass(Payments.class);
         verify(payments).saveAndFlush(payment.capture());
         assertThat(payment.getValue().getStatus()).isEqualTo(PaymentsStatus.PENDING);
+        assertThat(payment.getValue().getTotalAmount()).isEqualTo(7500);
         assertThat(payment.getValue().getIdempotencyKey()).isEqualTo("fixed-key");
         verify(outbox).save(argThat(event -> event.getAggregateId().equals(200L)
             && event.getEventType() == com.moongcheap_backend.common.outbox.domain.OutboxEventType.PAYMENT_SCHEDULE_SYNC));
