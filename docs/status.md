@@ -73,6 +73,12 @@ PAYMENT_PENDING → CLOSED                 (본인 결제 완료)
 ASSIGNED / UNASSIGNED → CANCELED         (사용자 취소, MVP 확정 대기)
 ```
 
+자동결제 성공 응답 검증 후 결제 `SUCCEEDED`, 주문 `PAYMENT_COMPLETED`,
+주문에 연결된 수요 `CLOSED`를 같은 트랜잭션에서 반영한다.
+수요는 현재 `PAYMENT_PENDING`일 때만 전환하므로 이미 종료·취소된 상태를 덮어쓰지 않는다.
+승인 응답 검증 실패나 오래된 처리 토큰의 응답은 수요를 종료하지 않는다.
+이 처리는 이후 결제 완료 이벤트에 적용하며, 과거에 누락된 수요 상태를 일괄 보정하지 않는다.
+
 ---
 
 ## ProductStatus

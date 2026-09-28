@@ -1,6 +1,7 @@
 package com.moongcheap_backend.payments.application;
 
 import com.moongcheap_backend.common.outbox.domain.OutboxEvent;
+import com.moongcheap_backend.demand.application.demand.OrderDemandService;
 import com.moongcheap_backend.common.outbox.domain.OutboxEventType;
 import com.moongcheap_backend.common.outbox.infrastructure.OutboxEventRepository;
 import com.moongcheap_backend.groupbuy.domain.GroupBuyStatus;
@@ -37,6 +38,7 @@ public class PaymentExecutionService {
     private final PaymentsRepository paymentsRepository;
     private final OutboxEventRepository outboxRepository;
     private final PaymentQueueProperties properties;
+    private final OrderDemandService orderDemandService;
 
     public record Execution(Long paymentId, UUID processingToken,
         AutomaticPaymentRequest request, String idempotencyKey, boolean reconciliation) {
@@ -152,6 +154,7 @@ public class PaymentExecutionService {
         payment.completeBrandPay(response.paymentKey(), response.approvedAt()
             .atZoneSameInstant(ZONE_SEOUL).toLocalDateTime());
         payment.getOrders().setOrderStatus(OrderStatus.PAYMENT_COMPLETED);
+        orderDemandService.closeAfterPayment(payment.getOrders().getDemandId());
         sync(paymentId, nowLocal());
     }
 

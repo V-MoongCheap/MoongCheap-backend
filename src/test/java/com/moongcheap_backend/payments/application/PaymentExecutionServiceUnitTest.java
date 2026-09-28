@@ -3,6 +3,7 @@ package com.moongcheap_backend.payments.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import com.moongcheap_backend.common.outbox.domain.*;
+import com.moongcheap_backend.demand.application.demand.OrderDemandService;
 import com.moongcheap_backend.common.outbox.infrastructure.OutboxEventRepository;
 import com.moongcheap_backend.groupbuy.domain.*;
 import com.moongcheap_backend.member.domain.Member;
@@ -22,7 +23,8 @@ class PaymentExecutionServiceUnitTest {
     PaymentsRepository payments = mock(PaymentsRepository.class);
     OutboxEventRepository outbox = mock(OutboxEventRepository.class);
     PaymentQueueProperties properties = new PaymentQueueProperties();
-    PaymentExecutionService service = new PaymentExecutionService(orders, payments, outbox, properties);
+    OrderDemandService demands = mock(OrderDemandService.class);
+    PaymentExecutionService service = new PaymentExecutionService(orders, payments, outbox, properties, demands);
     Payments payment;
     OutboxEvent event;
 
@@ -34,9 +36,9 @@ class PaymentExecutionServiceUnitTest {
         GroupBuy group = new GroupBuy(null, null, "상품", 1, 1,
             LocalDateTime.now(), GroupBuyStatus.RECRUITMENT_COMPLETED);
         Orders order = Orders.create("order-100", 10L, 1L, method, group,
-            1L, "상품", "img", 2, 10000, 0, 1L, "판매자");
+            1L, "상품", "img", 1, 4500, 3000, 1L, "판매자");
         ReflectionTestUtils.setField(order, "id", 100L);
-        payment = Payments.readyBrandPay(order, "order-100", "상품", 20000, PaymentsMethod.CARD);
+        payment = Payments.readyBrandPay(order, "order-100", "상품", order.getTotalAmount(), PaymentsMethod.CARD);
         payment.schedule(method, "customer", "same-key");
         ReflectionTestUtils.setField(payment, "id", 200L);
         ReflectionTestUtils.setField(payment, "createdAt",
@@ -56,6 +58,7 @@ class PaymentExecutionServiceUnitTest {
         var execution = service.begin(200L).orElseThrow();
         assertThat(execution.idempotencyKey()).isEqualTo("same-key");
         assertThat(execution.reconciliation()).isFalse();
+        assertThat(execution.request().amount()).isEqualTo(7500);
         assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.UNKNOWN);
         assertThat(payment.getAttemptCount()).isEqualTo(1);
         assertThat(payment.getProcessingToken()).isEqualTo(execution.processingToken());
@@ -64,19 +67,30 @@ class PaymentExecutionServiceUnitTest {
     @Test void 오래된_토큰은_성공결과를_반영하지_못한다() {
         var execution = service.begin(200L).orElseThrow();
         service.complete(200L, UUID.randomUUID(), new BrandPayPaymentClient.AutomaticPaymentResponse(
-            "pk", "order-100", "상품", 20000, "DONE", OffsetDateTime.now()));
+            "pk", "order-100", "상품", 7500, "DONE", OffsetDateTime.now()));
         assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.UNKNOWN);
         assertThat(payment.getOrders().getOrderStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        verifyNoInteractions(demands);
         assertThat(payment.getProcessingToken()).isEqualTo(execution.processingToken());
     }
 
-    @Test void 현재_토큰은_결제와_주문을_함께_완료하고_Outbox를_요청한다() {
+    @Test void 현재_토큰은_결제와_주문과_수요를_함께_완료하고_Outbox를_요청한다() {
         var execution = service.begin(200L).orElseThrow();
         service.complete(200L, execution.processingToken(),
             new BrandPayPaymentClient.AutomaticPaymentResponse("pk", "order-100", "상품",
-                20000, "DONE", OffsetDateTime.parse("2026-09-22T09:00:00+09:00")));
+                7500, "DONE", OffsetDateTime.parse("2026-09-22T09:00:00+09:00")));
         assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.SUCCEEDED);
         assertThat(payment.getOrders().getOrderStatus()).isEqualTo(OrderStatus.PAYMENT_COMPLETED);
+        verify(demands).closeAfterPayment(10L);
         assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
+    }
+
+    @Test void 승인금액이_다르면_수요를_종료하지_않는다() {
+        var execution = service.begin(200L).orElseThrow();
+        service.complete(200L, execution.processingToken(),
+            new BrandPayPaymentClient.AutomaticPaymentResponse("pk", "order-100", "상품",
+                4500, "DONE", OffsetDateTime.now()));
+        assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.REVIEW_REQUIRED);
+        verifyNoInteractions(demands);
     }
 }

@@ -1,6 +1,7 @@
 package com.moongcheap_backend.order.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -38,6 +39,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -76,6 +79,52 @@ class OrderServiceUnitTest {
     private ArgumentCaptor<List<Orders>> ordersCaptor;
 
     @Nested
+    @DisplayName("주문 총액 및 상세 결제정보")
+    class OrderAmountTest {
+
+        @ParameterizedTest
+        @CsvSource({"1, 4500, 3000, 7500", "5, 4500, 3000, 25500", "2, 4500, 0, 9000"})
+        void 주문과_상세_결제정보는_상품금액에_배송비를_한번_포함한다(
+            int quantity, int price, int deliveryFee, int total) {
+            Orders order = create(quantity, price, deliveryFee);
+            var info = new PaymentPublicService().getForOrder(order);
+
+            assertThat(order.getTotalAmount()).isEqualTo(total);
+            assertThat(info.productAmount()).isEqualTo(quantity * price);
+            assertThat(info.deliveryFee()).isEqualTo(deliveryFee);
+            assertThat(info.totalPaymentAmount()).isEqualTo(total);
+        }
+
+        @Test
+        void 배송비_합산이_정수범위를_넘으면_잘못된_총액을_저장하지_않는다() {
+            assertThatThrownBy(() -> create(1, Integer.MAX_VALUE, 1))
+                .isInstanceOf(ArithmeticException.class);
+        }
+
+        private Orders create(int quantity, int price, int deliveryFee) {
+            return Orders.create(ORDER_NO, 1L, MEMBER_ID, null, null, 1L,
+                "상품", "image", quantity, price, deliveryFee, 1L, "판매자");
+        }
+    }
+
+    @Test
+    void 배송비가_있는_실제_주문의_목록_총액은_7500원이다() {
+        Orders order = Orders.create(ORDER_NO, 1L, MEMBER_ID, null, null,
+            1L, "상품", "image", 1, 4500, 3000, 1L, "판매자");
+        order.setOrderStatus(OrderStatus.PAYMENT_COMPLETED);
+        org.springframework.test.util.ReflectionTestUtils.setField(
+            order, "createdAt", LocalDateTime.of(2026, 9, 26, 12, 0));
+        Pageable pageable = PageRequest.of(0, 20);
+        when(ordersRepository.findAllByMemberIdAndOrderStatusIn(
+            MEMBER_ID, Set.of(OrderStatus.PAYMENT_COMPLETED), pageable))
+            .thenReturn(new PageImpl<>(List.of(order)));
+
+        var response = orderService.viewOrderList(MEMBER_ID, OrderListTab.PAYMENT_COMPLETED, pageable);
+
+        assertThat(response.getContent().getFirst().totalAmount()).isEqualTo(7500);
+    }
+
+    @Nested
     @DisplayName("자동 주문 정상 테스트")
     class AutoCreateOrderTest {
 
@@ -105,7 +154,7 @@ class OrderServiceUnitTest {
             assertThat(savedOrders)
                 .extracting(Orders::getTotalAmount)
                 .containsExactlyElementsOf(IntStream.rangeClosed(1, 40)
-                    .map(quantity -> 10_000 * quantity)
+                    .map(quantity -> 10_000 * quantity + 3_000)
                     .boxed()
                     .toList());
             assertThat(savedOrders)
@@ -203,7 +252,7 @@ class OrderServiceUnitTest {
         }
 
         @Test
-        void 생성된_주문의_총금액은_수요_수량과_상품_단가를_곱한_금액이다() {
+        void 생성된_주문의_총금액은_상품금액에_배송비를_한번_더한_금액이다() {
             Demand demand = org.mockito.Mockito.mock(Demand.class);
             when(demand.getId()).thenReturn(100L);
             when(demand.getMemberId()).thenReturn(1L);
@@ -216,8 +265,8 @@ class OrderServiceUnitTest {
             verify(ordersRepository).saveAll(ordersCaptor.capture());
             Orders createdOrder = ordersCaptor.getValue().getFirst();
             assertThat(createdOrder.getTotalAmount())
-                .isEqualTo(createdOrder.getSum() * createdOrder.getPrice())
-                .isEqualTo(demand.getQuantity() * product.getUnitPrice());
+                .isEqualTo(createdOrder.getSum() * createdOrder.getPrice() + createdOrder.getDeliveryFee())
+                .isEqualTo(demand.getQuantity() * product.getUnitPrice() + product.getShippingFee());
         }
 
         @Test
@@ -362,10 +411,10 @@ class OrderServiceUnitTest {
             assertThat(savedOrders.get(0).getOrderNo()).startsWith("ORD-");
             assertThat(savedOrders.get(0).getMemberId()).isEqualTo(1L);
             assertThat(savedOrders.get(0).getBrandPayMethod()).isSameAs(payMethod);
-            assertThat(savedOrders.get(0).getTotalAmount()).isEqualTo(20_000);
+            assertThat(savedOrders.get(0).getTotalAmount()).isEqualTo(23_000);
             assertThat(savedOrders.get(1).getMemberId()).isEqualTo(2L);
             assertThat(savedOrders.get(1).getBrandPayMethod()).isNull();
-            assertThat(savedOrders.get(1).getTotalAmount()).isEqualTo(10_000);
+            assertThat(savedOrders.get(1).getTotalAmount()).isEqualTo(13_000);
         }
 
         @Test
@@ -492,56 +541,38 @@ class OrderServiceUnitTest {
         }
 
         @Test
-        void 전체_탭은_회원의_모든_주문을_조회한다() {
-            when(ordersRepository.findAllByMemberId(MEMBER_ID, pageable))
+        void 결제완료_탭은_회원의_결제완료_주문을_조회한다() {
+            when(ordersRepository.findAllByMemberIdAndOrderStatusIn(
+                MEMBER_ID, Set.of(OrderStatus.PAYMENT_COMPLETED), pageable))
                 .thenReturn(new PageImpl<>(List.of(order)));
 
             Page<OrderListResponse> result =
-                orderService.viewOrderList(MEMBER_ID, OrderListTab.ALL, pageable);
+                orderService.viewOrderList(MEMBER_ID, OrderListTab.PAYMENT_COMPLETED, pageable);
 
             assertOrderListResponse(result.getContent().getFirst());
             verify(orderMemberInfoService).validateActiveMember(MEMBER_ID);
         }
 
-        @Test
-        void 진행중_탭은_진행중인_네가지_상태를_조회한다() {
-            Set<OrderStatus> statuses = Set.of(
-                OrderStatus.PAYMENT_PENDING,
-                OrderStatus.PAYMENT_COMPLETED,
-                OrderStatus.PREPARING_SHIPMENT,
-                OrderStatus.SHIPPED
-            );
+        @ParameterizedTest
+        @CsvSource({
+            "PAYMENT_COMPLETED, PAYMENT_COMPLETED",
+            "PREPARING_SHIPMENT, PREPARING_SHIPMENT",
+            "SHIPPED, SHIPPED",
+            "DELIVERED, DELIVERED"
+        })
+        void 개별_진행상태_탭은_해당_상태만_조회한다(OrderListTab tab, OrderStatus status) {
+            Set<OrderStatus> statuses = Set.of(status);
+            when(order.getOrderStatus()).thenReturn(status);
             when(ordersRepository.findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, pageable))
                 .thenReturn(new PageImpl<>(List.of(order)));
 
             Page<OrderListResponse> result =
-                orderService.viewOrderList(MEMBER_ID, OrderListTab.IN_PROGRESS, pageable);
+                orderService.viewOrderList(MEMBER_ID, tab, pageable);
 
-            assertOrderListResponse(result.getContent().getFirst());
-        }
-
-        @Test
-        void 배송완료_탭은_배송완료_상태를_조회한다() {
-            Set<OrderStatus> statuses = Set.of(OrderStatus.DELIVERED);
-            when(ordersRepository.findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, pageable))
-                .thenReturn(new PageImpl<>(List.of(order)));
-
-            Page<OrderListResponse> result =
-                orderService.viewOrderList(MEMBER_ID, OrderListTab.DELIVERED, pageable);
-
-            assertOrderListResponse(result.getContent().getFirst());
-        }
-
-        @Test
-        void 구매확정_탭은_구매확정_상태를_조회한다() {
-            Set<OrderStatus> statuses = Set.of(OrderStatus.COMPLEDED);
-            when(ordersRepository.findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, pageable))
-                .thenReturn(new PageImpl<>(List.of(order)));
-
-            Page<OrderListResponse> result =
-                orderService.viewOrderList(MEMBER_ID, OrderListTab.COMPLETED, pageable);
-
-            assertOrderListResponse(result.getContent().getFirst());
+            assertThat(result.getContent()).hasSize(1);
+            assertThat(result.getContent().getFirst().orderStatus()).isEqualTo(status);
+            verify(ordersRepository).findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, pageable);
+            verify(orderMemberInfoService).validateActiveMember(MEMBER_ID);
         }
 
         @Test
@@ -554,15 +585,16 @@ class OrderServiceUnitTest {
             List<Orders> secondPageOrders = IntStream.rangeClosed(21, 25)
                 .mapToObj(this::createOrder)
                 .toList();
-            when(ordersRepository.findAllByMemberId(MEMBER_ID, firstPageable))
+            Set<OrderStatus> statuses = Set.of(OrderStatus.PAYMENT_COMPLETED);
+            when(ordersRepository.findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, firstPageable))
                 .thenReturn(new PageImpl<>(firstPageOrders, firstPageable, 25));
-            when(ordersRepository.findAllByMemberId(MEMBER_ID, secondPageable))
+            when(ordersRepository.findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, secondPageable))
                 .thenReturn(new PageImpl<>(secondPageOrders, secondPageable, 25));
 
             Page<OrderListResponse> firstPage =
-                orderService.viewOrderList(MEMBER_ID, OrderListTab.ALL, firstPageable);
+                orderService.viewOrderList(MEMBER_ID, OrderListTab.PAYMENT_COMPLETED, firstPageable);
             Page<OrderListResponse> secondPage =
-                orderService.viewOrderList(MEMBER_ID, OrderListTab.ALL, secondPageable);
+                orderService.viewOrderList(MEMBER_ID, OrderListTab.PAYMENT_COMPLETED, secondPageable);
 
             assertThat(firstPage.getNumber()).isZero();
             assertThat(firstPage.getNumberOfElements()).isEqualTo(20);
@@ -578,8 +610,8 @@ class OrderServiceUnitTest {
             assertThat(secondPage.isFirst()).isFalse();
             assertThat(secondPage.isLast()).isTrue();
 
-            verify(ordersRepository).findAllByMemberId(MEMBER_ID, firstPageable);
-            verify(ordersRepository).findAllByMemberId(MEMBER_ID, secondPageable);
+            verify(ordersRepository).findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, firstPageable);
+            verify(ordersRepository).findAllByMemberIdAndOrderStatusIn(MEMBER_ID, statuses, secondPageable);
         }
 
         private Orders createOrder(int index) {

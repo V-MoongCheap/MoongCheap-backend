@@ -188,7 +188,7 @@ class OrderServiceUnitExceptionTest {
 
             assertBusinessException(
                 () -> orderService.viewOrderList(
-                    MEMBER_ID, OrderListTab.ALL, Pageable.unpaged()
+                    MEMBER_ID, OrderListTab.PAYMENT_COMPLETED, Pageable.unpaged()
                 ),
                 ErrorCode.MEMBER_NOT_FOUND
             );

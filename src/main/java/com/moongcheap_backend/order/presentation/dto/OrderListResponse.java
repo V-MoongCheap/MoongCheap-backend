@@ -24,7 +24,7 @@ public record OrderListResponse(
     String imageUrl, // 상품 이미지 URL
     String productName, // 상품명
     Integer quantity, // 주문 수량
-    Integer totalAmount // 주문 금액
+    Integer totalAmount // 상품 단가 × 수량 + 주문당 배송비
 ) {
 
 }

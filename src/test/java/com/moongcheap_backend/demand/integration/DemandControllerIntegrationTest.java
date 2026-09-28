@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.moongcheap_backend.demand.domain.demand.Demand;
+import com.moongcheap_backend.demand.application.demand.OrderDemandService;
 import com.moongcheap_backend.demand.domain.demand.DemandStatus;
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoard;
 import com.moongcheap_backend.demand.domain.demandBoard.DemandBoardStatus;
@@ -35,10 +36,30 @@ class DemandControllerIntegrationTest extends AbstractIntegrationTest {
     @Autowired private DemandRepository demandRepository;
     @Autowired private DemandBoardRepository demandBoardRepository;
     @Autowired private SessionTestHelper sessionTestHelper;
+    @Autowired private OrderDemandService orderDemandService;
 
     private Cookie sessionCookie;
     private Long memberId;
     private Long catalogId;
+
+    @Test
+    void 결제완료시_수요를_종료하며_중복호출은_같은_상태를_유지한다() {
+        Demand demand = demandFixture.saveWithStatus(
+            memberId, catalogId, null, DemandStatus.PAYMENT_PENDING);
+        orderDemandService.closeAfterPayment(demand.getId());
+        orderDemandService.closeAfterPayment(demand.getId());
+        assertThat(demandRepository.findById(demand.getId()).orElseThrow().getStatus())
+            .isEqualTo(DemandStatus.CLOSED);
+    }
+
+    @Test
+    void 이미_취소된_수요는_결제완료로_덮어쓰지_않는다() {
+        Demand demand = demandFixture.saveWithStatus(
+            memberId, catalogId, null, DemandStatus.CANCELED);
+        orderDemandService.closeAfterPayment(demand.getId());
+        assertThat(demandRepository.findById(demand.getId()).orElseThrow().getStatus())
+            .isEqualTo(DemandStatus.CANCELED);
+    }
 
     @BeforeEach
     void setUp() {
