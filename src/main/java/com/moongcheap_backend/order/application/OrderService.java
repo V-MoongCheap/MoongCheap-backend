@@ -159,17 +159,21 @@ public class OrderService {
         orderMemberInfoService.validateActiveMember(memberId);
 
         Page<Orders> orders = switch (orderListTab) {
-            case PAYMENT_COMPLETED -> ordersRepository.findAllByMemberIdAndOrderStatusIn(
-                memberId, Set.of(OrderStatus.PAYMENT_COMPLETED), pageable
-            );
-            case PREPARING_SHIPMENT -> ordersRepository.findAllByMemberIdAndOrderStatusIn(
-                memberId, Set.of(OrderStatus.PREPARING_SHIPMENT), pageable
-            );
-            case SHIPPED -> ordersRepository.findAllByMemberIdAndOrderStatusIn(
-                memberId, Set.of(OrderStatus.SHIPPED), pageable
+            case ALL -> ordersRepository.findAllByMemberId(memberId, pageable);
+            case IN_PROGRESS -> ordersRepository.findAllByMemberIdAndOrderStatusIn(
+                memberId,
+                Set.of(
+                    OrderStatus.PAYMENT_COMPLETED,
+                    OrderStatus.PREPARING_SHIPMENT,
+                    OrderStatus.SHIPPED
+                ),
+                pageable
             );
             case DELIVERED -> ordersRepository.findAllByMemberIdAndOrderStatusIn(
                 memberId, Set.of(OrderStatus.DELIVERED), pageable
+            );
+            case COMPLETED -> ordersRepository.findAllByMemberIdAndOrderStatusIn(
+                memberId, Set.of(OrderStatus.COMPLEDED), pageable
             );
         };
 

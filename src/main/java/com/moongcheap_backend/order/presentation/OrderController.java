@@ -35,13 +35,11 @@ public class OrderController {
     //주문목록조회
     @Operation(
         summary = "주문 목록 조회",
-        description = "탭별로 내 주문 목록을 조회합니다. PAYMENT_COMPLETED(결제 완료), "
-            + "PREPARING_SHIPMENT(상품 준비 중), SHIPPED(배송 중), DELIVERED(배송 완료)를 지원합니다. "
-            + "탭 생략 시 PAYMENT_COMPLETED이며 기본 페이지 크기는 20개입니다."
+        description = "탭별로 내 주문 목록을 조회합니다. 탭을 생략하면 전체 주문을 조회하며, 기본 페이지 크기는 20개입니다."
     )
     @GetMapping("/list")
     public ResponseEntity<Page<OrderListResponse>> orderList(SessionPrincipal principal,
-        @RequestParam(defaultValue = "PAYMENT_COMPLETED") OrderListTab tab,
+        @RequestParam(defaultValue = "ALL") OrderListTab tab,
         @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
         Pageable pageable) {
         return ResponseEntity.ok(orderService.viewOrderList(principal.memberId(), tab, pageable));
@@ -83,10 +81,10 @@ public class OrderController {
     }
 
     public enum OrderListTab {
-        PAYMENT_COMPLETED,
-        PREPARING_SHIPMENT,
-        SHIPPED,
-        DELIVERED
+        ALL,
+        IN_PROGRESS,
+        DELIVERED,
+        COMPLETED
     }
 
     //구매 확정
