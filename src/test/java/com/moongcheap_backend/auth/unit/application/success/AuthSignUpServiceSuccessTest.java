@@ -61,7 +61,7 @@ class AuthSignUpServiceSuccessTest {
 
         @Test
         void 유효한_정보로_회원가입을_요청한다() {
-            SignUpRequestDto dto = new SignUpRequestDto("user1234", "pass1234!", "pass1234!", "닉네임", "test@example.com");
+            SignUpRequestDto dto = new SignUpRequestDto("user1234", "pass1234!", "pass1234!", "닉네임", "test@example.com", true, true, true);
             Member savedMember = mock(Member.class);
             when(savedMember.getId()).thenReturn(1L);
             when(memberRepository.existsByLoginIdAndDeletedAtIsNull("user1234")).thenReturn(false);

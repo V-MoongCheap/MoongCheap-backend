@@ -9,6 +9,8 @@ public record AuctionResultRow(
     String catalogThumbnailUrl,
     Integer unitPrice,
     Integer shippingFee,
+    Integer desiredPriceMin,
+    Integer desiredPriceMax,
     String sellerName,
     Integer quantity,
     Integer participantCount,

@@ -33,18 +33,22 @@ public class ProductCatalog extends BaseTimeEntity {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "category_id")
+    private Long categoryId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private ProductCatalogStatus status;
 
     @Builder
     private ProductCatalog(String name, String specSummary, Integer listPrice,
-                           String thumbnailUrl, String description) {
+                           String thumbnailUrl, String description, Long categoryId) {
         this.name = name;
         this.specSummary = specSummary;
         this.listPrice = listPrice;
         this.thumbnailUrl = thumbnailUrl;
         this.description = description;
+        this.categoryId = categoryId;
         this.status = ProductCatalogStatus.ACTIVE;
     }
 
