@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "moongcheap.payments.queue")
 public class PaymentQueueProperties {
     private boolean enabled;
-    private boolean workerEnabled = true;
     private int workers = 1;
     private Duration visibilityDelay = Duration.ofSeconds(60);
     private Duration lease = Duration.ofSeconds(60);

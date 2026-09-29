@@ -1,6 +1,5 @@
 package com.moongcheap_backend.payments.application;
 
-import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import com.moongcheap_backend.common.outbox.domain.OutboxEventType;
 import com.moongcheap_backend.common.outbox.domain.OutboxEventStatus;
 import com.moongcheap_backend.common.outbox.infrastructure.OutboxEventRepository;
@@ -18,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class PaymentOutboxPublishService {
-    private final LoadTestMetrics metrics;
     private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
     private final PaymentsRepository paymentsRepository;
     private final OutboxEventRepository outboxRepository;
@@ -51,12 +49,8 @@ public class PaymentOutboxPublishService {
                 schedule.remove(paymentId);
             }
             event.get().markPublished(now);
-            metrics.committed("payment_schedule_sync",
-                payment.isPresent() && payment.get().isAutomaticallyExecutable() ? "scheduled" : "removed",
-                1, event.get().getPendingSince());
         } catch (RuntimeException exception) {
             event.get().scheduleRetry(now);
-            metrics.committed("outbox_retry", "PAYMENT_SCHEDULE_SYNC", 1, null);
             log.warn("Payment Outbox publish deferred: eventId={}", eventId);
         }
     }

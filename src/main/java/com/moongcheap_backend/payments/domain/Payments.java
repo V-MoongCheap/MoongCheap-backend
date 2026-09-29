@@ -80,13 +80,6 @@ public class Payments extends BaseTimeEntity {
     @Column(name = "attempt_count", nullable = false)
     private int attemptCount;
 
-    @Column(name = "initial_scheduled_at", updatable = false)
-    private LocalDateTime initialScheduledAt;
-
-    public void recordInitialSchedule(LocalDateTime scheduledAt) {
-        if (initialScheduledAt == null) initialScheduledAt = scheduledAt;
-    }
-
     @Column(name = "processing_token")
     private UUID processingToken;
 

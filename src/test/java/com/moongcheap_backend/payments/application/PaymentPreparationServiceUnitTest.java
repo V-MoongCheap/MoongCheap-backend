@@ -1,6 +1,5 @@
 package com.moongcheap_backend.payments.application;
 
-import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import com.moongcheap_backend.common.outbox.domain.OutboxEvent;
@@ -23,7 +22,7 @@ class PaymentPreparationServiceUnitTest {
     CustomerKeyRepository customers = mock(CustomerKeyRepository.class);
     OutboxEventRepository outbox = mock(OutboxEventRepository.class);
     BrandPayIdempotencyKeyGenerator keys = mock(BrandPayIdempotencyKeyGenerator.class);
-    PaymentPreparationService service = new PaymentPreparationService(mock(LoadTestMetrics.class),
+    PaymentPreparationService service = new PaymentPreparationService(
         orders, payments, customers, outbox, keys);
 
     @Test void 결제와_Outbox를_같은_예약에서_생성한다() {

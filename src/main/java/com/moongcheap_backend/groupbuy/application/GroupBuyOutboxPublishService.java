@@ -1,6 +1,5 @@
 package com.moongcheap_backend.groupbuy.application;
 
-import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import com.moongcheap_backend.common.outbox.domain.OutboxEvent;
 import com.moongcheap_backend.common.outbox.domain.OutboxEventType;
 import com.moongcheap_backend.common.outbox.infrastructure.OutboxEventRepository;
@@ -17,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class GroupBuyOutboxPublishService {
-    private final LoadTestMetrics metrics;
 
     private final OutboxEventRepository outboxEventRepository;
     private final GroupBuyJudgmentSchedule judgmentSchedule;
@@ -33,11 +31,9 @@ public class GroupBuyOutboxPublishService {
                 // 외부 발행 성공 후에만 완료 처리한다. 중복 발행은 소비자의 멱등 처리로 흡수한다.
                 publish(event);
                 event.markPublished(now);
-                metrics.committed("outbox_publish", event.getEventType().name(), 1, event.getPendingSince());
             } catch (RuntimeException exception) {
                 // Redis 장애가 DB 트랜잭션 전체를 롤백시키지 않도록 다음 시각에 재시도한다.
                 event.scheduleRetry(now);
-                metrics.committed("outbox_retry", event.getEventType().name(), 1, null);
                 log.warn(
                     "Failed to publish outbox event: id={}, type={}, retryCount={}",
                     event.getId(), event.getEventType(), event.getRetryCount(), exception
