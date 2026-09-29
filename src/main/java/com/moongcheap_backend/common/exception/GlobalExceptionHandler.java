@@ -14,6 +14,8 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 import java.util.Map;
@@ -124,6 +126,13 @@ public class GlobalExceptionHandler {
         }
         log.error("Unhandled data integrity violation", e);
         ErrorCode ec = ErrorCode.INTERNAL_ERROR;
+        return ResponseEntity.status(ec.getStatus())
+                .body(ApiError.of(ec.getCode(), ec.getMessage()));
+    }
+
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<ApiError> handleNotFound(Exception e) {
+        ErrorCode ec = ErrorCode.NOT_FOUND;
         return ResponseEntity.status(ec.getStatus())
                 .body(ApiError.of(ec.getCode(), ec.getMessage()));
     }

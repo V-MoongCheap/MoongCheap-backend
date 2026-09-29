@@ -5,10 +5,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.moongcheap_backend.auth.application.WithdrawService;
-import com.moongcheap_backend.auth.infrastructure.oauth.GoogleOAuth2Client;
-import com.moongcheap_backend.auth.infrastructure.oauth.KakaoOAuth2Client;
+import com.moongcheap_backend.auth.infrastructure.PendingProviderUnlinkRepository;
 import com.moongcheap_backend.auth.infrastructure.port.WithdrawEligibilityChecker;
-import com.moongcheap_backend.auth.infrastructure.session.AuthSessionManager;
 import com.moongcheap_backend.auth.presentation.dto.WithdrawRequestDto;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
@@ -20,8 +18,6 @@ import com.moongcheap_backend.member.infrastructure.ShippingAddressRepository;
 import com.moongcheap_backend.member.infrastructure.SocialCredentialRepository;
 import com.moongcheap_backend.notification.infrastructure.NotificationOptOutRepository;
 import java.util.Optional;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,11 +25,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpSession;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 @ExtendWith(MockitoExtension.class)
 class WithdrawServiceFailureTest {
@@ -43,26 +36,13 @@ class WithdrawServiceFailureTest {
     @Mock private SocialCredentialRepository socialCredentialRepository;
     @Mock private ShippingAddressRepository shippingAddressRepository;
     @Mock private NotificationOptOutRepository notificationOptOutRepository;
+    @Mock private PendingProviderUnlinkRepository pendingProviderUnlinkRepository;
     @Mock private PasswordEncoder passwordEncoder;
-    @Mock private AuthSessionManager sessionManager;
     @Mock private WithdrawEligibilityChecker eligibilityChecker;
-    @Mock private KakaoOAuth2Client kakaoOAuth2Client;
-    @Mock private GoogleOAuth2Client googleOAuth2Client;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private WithdrawService withdrawService;
-
-    @BeforeEach
-    void setUpRequestContext() {
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setSession(new MockHttpSession());
-        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-    }
-
-    @AfterEach
-    void clearRequestContext() {
-        RequestContextHolder.resetRequestAttributes();
-    }
 
     @Nested
     @DisplayName("withdraw - 실패")

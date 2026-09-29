@@ -6,6 +6,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 @Slf4j
@@ -23,6 +24,13 @@ public class KakaoOAuth2Client {
         this.adminKey = adminKey;
     }
 
+    /**
+     * Kakao 사용자 연결 끊기.
+     * - 2xx : 성공
+     * - 400/404 : 이미 연결 해제된 사용자 또는 존재하지 않는 target 으로 간주하여 정상 종료.
+     *            (결과적으로 unlink 상태이므로 재시도할 이유가 없음)
+     * - 그 외 (401/403/429/5xx 등) : 예외 전파. 워커가 재시도한다.
+     */
     public void unlink(String providerId) {
         if (adminKey == null || adminKey.isBlank()) {
             log.warn("Kakao admin key not configured; skipping unlink providerId={}", providerId);
@@ -34,15 +42,16 @@ public class KakaoOAuth2Client {
 
         try {
             restClient.post()
-                    .uri(UNLINK_URL)
-                    .header("Authorization", "KakaoAK " + adminKey)
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(body)
-                    .retrieve()
-                    .toBodilessEntity();
+                .uri(UNLINK_URL)
+                .header("Authorization", "KakaoAK " + adminKey)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(body)
+                .retrieve()
+                .toBodilessEntity();
             log.info("Kakao unlink success providerId={}", providerId);
-        } catch (Exception e) {
-            log.warn("Kakao unlink failed providerId={}", providerId, e);
+        } catch (HttpClientErrorException.BadRequest | HttpClientErrorException.NotFound e) {
+            log.info("Kakao unlink: target invalid or already unlinked, treating as success"
+                + " providerId={} status={}", providerId, e.getStatusCode().value());
         }
     }
 }

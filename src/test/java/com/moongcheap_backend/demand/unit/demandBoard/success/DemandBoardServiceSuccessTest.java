@@ -58,6 +58,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -244,12 +245,13 @@ class DemandBoardServiceSuccessTest {
         void 유효한_payMethod와_활성_보드에_참여한다() {
             Long memberId = 1L;
             Long boardId = 100L;
+            LocalDateTime saleEndAt = LocalDateTime.now().plusDays(1);
             DemandBoard board = mock(DemandBoard.class);
             when(board.getId()).thenReturn(boardId);
             when(board.getCatalogId()).thenReturn(10L);
             when(board.getPriceMin()).thenReturn(10000);
             when(board.getPriceMax()).thenReturn(20000);
-            when(board.getSaleEndAt()).thenReturn(LocalDateTime.now().plusDays(1));
+            when(board.getSaleEndAt()).thenReturn(saleEndAt);
 
             when(brandPayMethodRepository.existsByIdAndMemberIdAndStatus(
                 20L, memberId, PaymentsMethodStatus.ACTIVE)).thenReturn(true);
@@ -263,7 +265,19 @@ class DemandBoardServiceSuccessTest {
 
             service.join(memberId, boardId, request);
 
-            verify(demandRepository).saveAndFlush(any(Demand.class));
+            ArgumentCaptor<Demand> captor = ArgumentCaptor.forClass(Demand.class);
+            verify(demandRepository).saveAndFlush(captor.capture());
+            Demand persisted = captor.getValue();
+            assertThat(persisted.getStatus()).isEqualTo(DemandStatus.ASSIGNED);
+            assertThat(persisted.getDemandBoardId()).isEqualTo(boardId);
+            assertThat(persisted.getMemberId()).isEqualTo(memberId);
+            assertThat(persisted.getCatalogId()).isEqualTo(10L);
+            assertThat(persisted.getPayMethodId()).isEqualTo(20L);
+            assertThat(persisted.getDesiredPriceMin()).isEqualTo(10000);
+            assertThat(persisted.getDesiredPriceMax()).isEqualTo(20000);
+            assertThat(persisted.getDesireEndAt()).isEqualTo(saleEndAt);
+            assertThat(persisted.getQuantity()).isEqualTo(1);
+            assertThat(persisted.isSubstitutable()).isFalse();
             verify(board).increaseParticipantCount();
         }
     }
