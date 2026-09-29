@@ -2,6 +2,7 @@ package com.moongcheap_backend.common.loadtest;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,7 @@ public class OrderLoadTestController {
     }
 
     public record SeedRequest(int groups, int demandsPerGroup) { }
+    public record BulkCleanupRequest(List<UUID> runIds) { }
 
     @PostMapping("/seed")
     public OrderLoadTestService.Manifest seed(
@@ -56,6 +58,14 @@ public class OrderLoadTestController {
         @PathVariable UUID runId) {
         authenticate(supplied);
         return service.cleanup(runId);
+    }
+
+    @PostMapping("/cleanup-bulk")
+    public OrderLoadTestService.BulkCleanupReport cleanupBulk(
+        @RequestHeader(value = "X-Internal-Api-Key", defaultValue = "") String supplied,
+        @RequestBody BulkCleanupRequest request) {
+        authenticate(supplied);
+        return service.cleanupBulk(request == null ? null : request.runIds());
     }
 
     // 기존 필터의 dev bypass 설정과 무관하게 테스트 진입점의 인증을 유지한다.
