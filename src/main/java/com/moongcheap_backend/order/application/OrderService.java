@@ -1,6 +1,5 @@
 package com.moongcheap_backend.order.application;
 
-import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import com.moongcheap_backend.common.crypto.EncryptionService;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
@@ -47,7 +46,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @RequiredArgsConstructor
 public class OrderService {
-    private final LoadTestMetrics metrics;
 
     private static final int ORDER_BATCH_SIZE = 20;
     private static final Set<OrderStatus> SUMMARY_STATUSES = Set.of(
@@ -149,7 +147,6 @@ public class OrderService {
 
         // 실제 주문으로 생성된 수요만 공동구매 참여 인원에 반영한다.
         groupBuy.increaseParticipantCount(orders.size());
-        metrics.committed("order", "created", orders.size(), groupBuy.getCreatedAt());
         return null;
     }
 
