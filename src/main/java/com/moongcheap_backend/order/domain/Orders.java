@@ -73,7 +73,7 @@ public class Orders extends BaseTimeEntity {
     private String productName;
 
     // 상품 이미지 url
-    @Column(name = "image_url", nullable = false)
+    @Column(name = "image_url")
     private String imageUrl;
 
     // 수량

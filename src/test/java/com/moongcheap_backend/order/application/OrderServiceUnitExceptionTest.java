@@ -1,6 +1,7 @@
 package com.moongcheap_backend.order.application;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,8 +38,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class OrderServiceUnitExceptionTest {
 
     private static final Long MEMBER_ID = 1L;
@@ -105,70 +108,55 @@ class OrderServiceUnitExceptionTest {
         }
 
         @Test
-        void 판매중이_아닌_상품이면_주문을_생성할_수_없다() {
+        void 판매중이_아닌_상품이면_주문을_생성할_수_없다(CapturedOutput output) {
             when(seller.isSellable()).thenReturn(true);
             when(product.isOnSale()).thenReturn(false);
 
             assertBusinessException(() -> orderService.autoCreateOrder(10L),
                 ErrorCode.PRODUCT_NOT_ORDERABLE);
+            assertThat(output.getOut()).contains("groupBuyId=10",
+                "errorCode=PRODUCT_NOT_ORDERABLE", "reason=PRODUCT_NOT_ON_SALE");
         }
 
         @Test
-        void 상품의_판매자가_공동구매_판매자와_다르면_주문을_생성할_수_없다() {
+        void 상품의_판매자가_공동구매_판매자와_다르면_주문을_생성할_수_없다(CapturedOutput output) {
             prepareOrderableSellerAndProduct();
             when(seller.getId()).thenReturn(20L);
             when(product.getSellerId()).thenReturn(21L);
 
             assertBusinessException(() -> orderService.autoCreateOrder(10L),
                 ErrorCode.PRODUCT_NOT_ORDERABLE);
+            assertThat(output.getOut()).contains("groupBuyId=10",
+                "errorCode=PRODUCT_NOT_ORDERABLE", "reason=PRODUCT_SELLER_MISMATCH");
         }
 
         @Test
-        void 상품_썸네일이_null이면_주문을_생성할_수_없다() {
-            prepareOrderableSellerAndProduct();
-            when(seller.getId()).thenReturn(20L);
-            when(product.getSellerId()).thenReturn(20L);
-            when(product.getThumbnailUrl()).thenReturn(null);
-
-            assertBusinessException(() -> orderService.autoCreateOrder(10L),
-                ErrorCode.PRODUCT_NOT_ORDERABLE);
-        }
-
-        @Test
-        void 상품_썸네일이_공백이면_주문을_생성할_수_없다() {
-            prepareOrderableSellerAndProduct();
-            when(seller.getId()).thenReturn(20L);
-            when(product.getSellerId()).thenReturn(20L);
-            when(product.getThumbnailUrl()).thenReturn(" ");
-
-            assertBusinessException(() -> orderService.autoCreateOrder(10L),
-                ErrorCode.PRODUCT_NOT_ORDERABLE);
-        }
-
-        @Test
-        void 상품_단가가_null이면_주문을_생성할_수_없다() {
+        void 상품_단가가_null이면_주문을_생성할_수_없다(CapturedOutput output) {
             prepareProductValidationBeforePrice();
             when(product.getUnitPrice()).thenReturn(null);
 
             assertBusinessException(() -> orderService.autoCreateOrder(10L),
                 ErrorCode.PRODUCT_NOT_ORDERABLE);
+            assertThat(output.getOut()).contains("groupBuyId=10",
+                "errorCode=PRODUCT_NOT_ORDERABLE", "reason=PRODUCT_UNIT_PRICE_MISSING");
         }
 
         @Test
-        void 상품_배송비가_null이면_주문을_생성할_수_없다() {
+        void 상품_배송비가_null이면_주문을_생성할_수_없다(CapturedOutput output) {
             prepareProductValidationBeforePrice();
             when(product.getUnitPrice()).thenReturn(10_000);
             when(product.getShippingFee()).thenReturn(null);
 
             assertBusinessException(() -> orderService.autoCreateOrder(10L),
                 ErrorCode.PRODUCT_NOT_ORDERABLE);
+            assertThat(output.getOut()).contains("groupBuyId=10",
+                "errorCode=PRODUCT_NOT_ORDERABLE", "reason=PRODUCT_SHIPPING_FEE_MISSING");
         }
 
         private void prepareProductValidationBeforePrice() {
             prepareOrderableSellerAndProduct();
             when(seller.getId()).thenReturn(20L);
             when(product.getSellerId()).thenReturn(20L);
-            when(product.getThumbnailUrl()).thenReturn("https://example.com/image.jpg");
         }
 
         private void prepareOrderableSellerAndProduct() {

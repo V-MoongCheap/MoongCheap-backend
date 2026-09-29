@@ -20,6 +20,17 @@ class MoongCheapBackendApplicationTests extends AbstractIntegrationTest {
     }
 
     @Test
+    void 주문_이미지_컬럼은_null을_허용한다() throws Exception {
+        try (var connection = dataSource.getConnection();
+             var columns = connection.getMetaData().getColumns(
+                 connection.getCatalog(), connection.getSchema(), "orders", "image_url")) {
+            assertThat(columns.next()).isTrue();
+            assertThat(columns.getInt("NULLABLE"))
+                .isEqualTo(java.sql.DatabaseMetaData.columnNullable);
+        }
+    }
+
+    @Test
     void 결제기록없는_대기주문만_보정하고_배송비를_중복합산하지_않는다() throws Exception {
         // 연결별 임시 테이블에서 보정 SQL을 검증하고 롤백해 공용 테스트 DB를 보존한다.
         try (var connection = dataSource.getConnection()) {

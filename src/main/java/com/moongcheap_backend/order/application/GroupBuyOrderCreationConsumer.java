@@ -57,7 +57,8 @@ public class GroupBuyOrderCreationConsumer {
                 orderCreationStream.acknowledgeAndDelete(record);
             } catch (RuntimeException exception) {
                 // ACK하지 않은 메시지는 Pending에 남고 유휴 시간이 지나면 다시 회수된다.
-                log.warn("Group-buy order creation failed: id={}", record.getId(), exception);
+                log.warn("Group-buy order creation processing failed: id={}, groupBuyId={}",
+                    record.getId(), groupBuyId, exception);
             }
         }
     }
