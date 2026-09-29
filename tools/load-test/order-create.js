@@ -2,8 +2,8 @@ import http from 'k6/http';
 import { check } from 'k6';
 import exec from 'k6/execution';
 
-if (!__ENV.MANIFEST || !__ENV.BASE_URL || !__ENV.INTERNAL_API_KEY || !__ENV.LOADTEST_TOKEN) {
-  throw new Error('MANIFEST, BASE_URL, INTERNAL_API_KEY, LOADTEST_TOKEN are required');
+if (!__ENV.MANIFEST || !__ENV.BASE_URL || !__ENV.INTERNAL_API_KEY) {
+  throw new Error('MANIFEST, BASE_URL, INTERNAL_API_KEY are required');
 }
 const manifest = JSON.parse(open(__ENV.MANIFEST));
 const products = manifest.products;
@@ -36,10 +36,7 @@ export default function () {
   const response = http.post(
     `${base}/api/load-tests/internal/orders/${manifest.runId}/products/${product.productId}`,
     null,
-    { headers: {
-      'X-Internal-Api-Key': __ENV.INTERNAL_API_KEY,
-      'x-loadtest': __ENV.LOADTEST_TOKEN,
-    },
+    { headers: { 'X-Internal-Api-Key': __ENV.INTERNAL_API_KEY },
       tags: { name: 'load-test-order-create' }, timeout: '60s' },
   );
   check(response, {

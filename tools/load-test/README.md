@@ -25,11 +25,7 @@ QA 조작을 멈추고 테스트 시간과 데이터 정리 절차를 먼저 정
 ```bash
 export BASE_URL=https://your-test-backend
 read -rs -p 'Internal API key: ' INTERNAL_API_KEY
-echo
 export INTERNAL_API_KEY
-read -rs -p 'Load-test token: ' LOADTEST_TOKEN
-echo
-export LOADTEST_TOKEN
 export GROUP_COUNT=10
 export DEMANDS_PER_GROUP=10
 export LOAD_VUS=5
@@ -41,7 +37,6 @@ bash tools/load-test/run-orders.sh
 - 총 수요는 최대 10,000건, 공동구매는 최대 1,000개다.
 - `LOAD_MAX_DURATION`은 k6 요청 구간 제한이며 기본 `5m`이다.
 - `VERIFY_TIMEOUT_SECONDS`는 생성 요청 종료 후 추가 처리·대사 대기시간이다.
-- `LOADTEST_TOKEN`은 앞단의 부하테스트 요청 식별용 `x-loadtest` 헤더 값이며 저장소에 커밋하지 않는다.
 - tools/load-test/results/ 아래 실행별 디렉터리에 `manifest.json`, `k6-summary.json`, `verification.json`을 저장한다.
 - `RESULTS_DIR`로 결과 위치를 바꿀 수 있다. Snap k6는 호스트 /tmp와 격리되므로 공유 가능한 경로를 사용한다.
 - 생성 요청 실패가 있어도 대사를 시도하고, k6 실패 또는 대사 기한 초과 시 종료 코드가 0이 아니다.
@@ -53,34 +48,6 @@ bash tools/load-test/run-orders.sh
 고유 상품을 한 번씩 배정한다. 동일 manifest를 새 부하 실행에 재사용하면 이미 생성된 공동구매를 반환하므로
 신규 생성 성능 측정이 되지 않는다. 매 실행마다 새 fixture를 사용한다.
 
-## 10,000건 분할 시딩 후 동시 실행
-
-단일 10,000건 seed 요청이 외부 게이트웨이 시간 제한을 넘지 않도록 기본 1,000건씩 10개 run으로
-나누어 준비한 뒤, 모든 run의 상품을 한 번의 k6 실행에서 동시에 처리한다.
-
-```bash
-BATCH_COUNT=10 \
-GROUPS_PER_BATCH=10 \
-DEMANDS_PER_GROUP=100 \
-LOAD_VUS=50 \
-LOAD_MAX_DURATION=15m \
-VERIFY_TIMEOUT_SECONDS=1800 \
-bash tools/load-test/run-orders-batched.sh
-```
-
-기본 총량은 `10 * 10 * 100 = 10,000`건이다. 결과 디렉터리에는 개별 `manifest-NNN.json`,
-전체 k6 입력인 `workload.json`, 개별 검증 결과와 `verification-summary.json`이 저장된다.
-중간 seed가 실패하면 이미 성공한 run을 보존하고 즉시 중단한다. 응답이 유실된 요청은 서버에서
-커밋됐을 수 있으므로 무작정 재실행하지 않고 DB marker와 서버 로그를 먼저 확인한다.
-
-전체 run 정리는 다음 명령으로 수행하고 프롬프트에 표시된 확인 문구를 그대로 입력한다.
-정리 API는 runId를 최대 5개씩 묶어 DB set 기반 삭제와 Redis Stream 단일 스캔을 수행한다.
-
-```bash
-bash tools/load-test/cleanup-orders-batched.sh \
-  tools/load-test/results/order-load-test-batched.XXXXXX/workload.json
-```
-
 ## API
 
 모든 요청에 `X-Internal-Api-Key`가 필요하다. 응답은 이 컨트롤러의 JSON 객체다.
@@ -90,7 +57,6 @@ bash tools/load-test/cleanup-orders-batched.sh \
 | `POST /api/load-tests/internal/orders/seed` | `{"groups":10,"demandsPerGroup":10}` | 원본 수요 ID·상품 ID·기대 수량 등을 담은 manifest |
 | `POST /api/load-tests/internal/orders/{runId}/products/{productId}` | 본문 없음 | 실제 생성 경로의 `groupBuyId` |
 | `POST /api/load-tests/internal/orders/verify` | 시딩 시 받은 manifest 전체 | `passed`, 예상/실제 주문 수, 위반 목록 |
-| `POST /api/load-tests/internal/orders/cleanup-bulk` | `{"runIds":[...]}` (최대 5개) | 여러 run의 DB·Stream·판정/결제 예약 삭제 합계 |
 | `DELETE /api/load-tests/internal/orders/{runId}` | 본문 없음 | 해당 run의 DB·Stream·판정/결제 예약 삭제 건수 |
 
 생성 진입점은 run ID로 표시된 상품만 허용하고, 같은 상품의 재전송은 기존 공동구매 ID를 반환한다.
