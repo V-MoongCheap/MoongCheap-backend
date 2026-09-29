@@ -50,6 +50,8 @@ public class OrderLoadTestService {
                          List<Violation> violations) { }
     public record CleanupReport(UUID runId, int products, int groupBuys, int orders,
                                 int demands, int members, long streamMessages) { }
+    public record BulkCleanupReport(int runs, int products, int groupBuys, int orders,
+                                    int demands, int members, long streamMessages) { }
 
     private void requireTestMode() {
         if (gateway.getMode() != PaymentGatewayProperties.Mode.MOCK || queue.isWorkerEnabled()) {
@@ -207,27 +209,52 @@ public class OrderLoadTestService {
     /** run marker로 소유권을 다시 확인하고 해당 실행 데이터만 제거한다. */
     @Transactional
     public CleanupReport cleanup(UUID runId) {
+        BulkCleanupReport result = cleanupOwnedRuns(List.of(runId));
+        return new CleanupReport(runId, result.products(), result.groupBuys(), result.orders(),
+            result.demands(), result.members(), result.streamMessages());
+    }
+
+    /** 여러 run을 한 번에 잠그고 set 기반으로 삭제해 반복 조회와 Redis 전체 스캔을 줄인다. */
+    @Transactional
+    public BulkCleanupReport cleanupBulk(List<UUID> runIds) {
+        return cleanupOwnedRuns(runIds);
+    }
+
+    private BulkCleanupReport cleanupOwnedRuns(List<UUID> runIds) {
         requireTestMode();
-        List<Long> productIds = jdbc.queryForList(
-            "select id from product where description=? for update", Long.class, marker(runId));
-        if (productIds.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-            "해당 run의 데이터가 없습니다.");
+        if (runIds == null || runIds.isEmpty() || runIds.size() > 5
+            || runIds.stream().anyMatch(java.util.Objects::isNull)
+            || new HashSet<>(runIds).size() != runIds.size()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "서로 다른 runId를 1~5개 지정해야 합니다.");
+        }
+        Set<String> markers = runIds.stream().map(OrderLoadTestService::marker)
+            .collect(Collectors.toSet());
+        List<Map<String, Object>> ownedProducts = namedJdbc.queryForList("""
+            select id, description, seller_id, demand_board_id, catalog_id
+            from product where description in (:markers) order by id for update
+            """, new MapSqlParameterSource("markers", markers));
+        Set<String> foundMarkers = ownedProducts.stream()
+            .map(row -> String.valueOf(row.get("description"))).collect(Collectors.toSet());
+        if (!foundMarkers.equals(markers)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "요청한 run 중 존재하지 않는 데이터가 있습니다.");
+        }
+        List<Long> productIds = values(ownedProducts, "id");
+        List<Long> boardIds = values(ownedProducts, "demand_board_id");
+        List<Long> catalogIds = values(ownedProducts, "catalog_id");
+        List<Long> sellerIds = values(ownedProducts, "seller_id");
         var productParams = new MapSqlParameterSource("productIds", productIds);
         List<Long> groupIds = namedJdbc.queryForList(
             "select id from group_buy where product_id in (:productIds)", productParams, Long.class);
-        List<Long> boardIds = namedJdbc.queryForList(
-            "select demand_board_id from product where id in (:productIds)", productParams, Long.class);
-        List<Long> catalogIds = namedJdbc.queryForList(
-            "select catalog_id from product where id in (:productIds)", productParams, Long.class);
         var boardParams = new MapSqlParameterSource("boardIds", boardIds);
         List<Long> demandIds = namedJdbc.queryForList(
             "select id from demand where demand_board_id in (:boardIds)", boardParams, Long.class);
         List<Long> buyerIds = namedJdbc.queryForList(
             "select member_id from demand where demand_board_id in (:boardIds)", boardParams, Long.class);
-        long sellerId = namedJdbc.queryForObject(
-            "select min(seller_id) from product where id in (:productIds)", productParams, Long.class);
-        Long sellerMemberId = jdbc.queryForObject("select member_id from seller where id=?",
-            Long.class, sellerId);
+        var sellerParams = new MapSqlParameterSource("sellerIds", sellerIds);
+        List<Long> sellerMemberIds = namedJdbc.queryForList(
+            "select member_id from seller where id in (:sellerIds)", sellerParams, Long.class);
 
         Set<Long> groupSet = new HashSet<>(groupIds);
         if (!groupIds.isEmpty()) {
@@ -238,7 +265,7 @@ public class OrderLoadTestService {
             namedJdbc.queryForList("select id from outbox_event where aggregate_id in (:ids) for update",
                 groups, Long.class);
         }
-        groupSet.forEach(judgmentSchedule::remove);
+        judgmentSchedule.removeAll(groupSet);
         long streamMessages = orderCreationStream.discardForGroupBuys(groupSet);
 
         int orderCount = groupIds.isEmpty() ? 0 : namedJdbc.queryForObject(
@@ -251,7 +278,7 @@ public class OrderLoadTestService {
                 where o.group_buy_id in (:ids)
                 """, groups, Long.class);
             if (!paymentIds.isEmpty()) {
-                paymentIds.forEach(paymentSchedule::remove);
+                paymentSchedule.removeAll(paymentIds);
                 namedJdbc.update("delete from outbox_event where event_type='PAYMENT_SCHEDULE_SYNC' and aggregate_id in (:ids)",
                     new MapSqlParameterSource("ids", paymentIds));
                 namedJdbc.update("delete from payments where id in (:ids)",
@@ -279,15 +306,18 @@ public class OrderLoadTestService {
             namedJdbc.update("delete from brand_pay_token where member_id in (:ids)", buyers);
             namedJdbc.update("delete from member where id in (:ids)", buyers);
         }
-        jdbc.update("delete from seller_key where seller_id=?", sellerId);
-        jdbc.update("delete from seller_payout_account where seller_id=?", sellerId);
-        jdbc.update("delete from payout where seller_id=?", sellerId);
-        jdbc.update("delete from seller where id=?", sellerId);
-        if (sellerMemberId != null) jdbc.update("delete from member where id=?", sellerMemberId);
+        namedJdbc.update("delete from seller_key where seller_id in (:sellerIds)", sellerParams);
+        namedJdbc.update("delete from seller_payout_account where seller_id in (:sellerIds)", sellerParams);
+        namedJdbc.update("delete from payout where seller_id in (:sellerIds)", sellerParams);
+        namedJdbc.update("delete from seller where id in (:sellerIds)", sellerParams);
+        if (!sellerMemberIds.isEmpty()) {
+            namedJdbc.update("delete from member where id in (:ids)",
+                new MapSqlParameterSource("ids", sellerMemberIds));
+        }
         namedJdbc.update("delete from product_catalog where id in (:ids)",
             new MapSqlParameterSource("ids", catalogIds));
-        return new CleanupReport(runId, productIds.size(), groupIds.size(), orderCount,
-            demandIds.size(), buyerIds.size() + 1, streamMessages);
+        return new BulkCleanupReport(runIds.size(), productIds.size(), groupIds.size(), orderCount,
+            demandIds.size(), buyerIds.size() + sellerMemberIds.size(), streamMessages);
     }
 
     private long member(boolean seller) {
@@ -296,6 +326,9 @@ public class OrderLoadTestService {
     }
 
     private long id(String sql, Object... args) { return jdbc.queryForObject(sql, Long.class, args); }
+    private static List<Long> values(List<Map<String, Object>> rows, String field) {
+        return rows.stream().map(row -> number(row, field)).distinct().toList();
+    }
     private static long number(Map<String, Object> row, String field) {
         return row.get(field) instanceof Number n ? n.longValue() : -1;
     }

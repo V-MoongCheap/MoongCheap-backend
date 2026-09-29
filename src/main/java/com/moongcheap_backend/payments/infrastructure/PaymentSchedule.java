@@ -48,6 +48,12 @@ public class PaymentSchedule {
         redisTemplate.opsForZSet().remove(KEY, paymentId.toString());
     }
 
+    public void removeAll(List<Long> paymentIds) {
+        if (paymentIds.isEmpty()) return;
+        redisTemplate.opsForZSet().remove(KEY,
+            paymentIds.stream().map(String::valueOf).toArray());
+    }
+
     public Double score(Long paymentId) {
         return redisTemplate.opsForZSet().score(KEY, paymentId.toString());
     }

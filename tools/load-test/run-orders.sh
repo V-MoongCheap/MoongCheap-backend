@@ -3,6 +3,7 @@ set -euo pipefail
 
 : "${BASE_URL:?Set BASE_URL to the deployed backend}"
 : "${INTERNAL_API_KEY:?Set INTERNAL_API_KEY}"
+: "${LOADTEST_TOKEN:?Set LOADTEST_TOKEN}"
 for executable in curl jq k6; do
   command -v "$executable" >/dev/null || { echo "Missing: $executable" >&2; exit 1; }
 done
@@ -23,7 +24,8 @@ payload=$(jq -n --argjson groups "$group_count" --argjson demands "$demands_per_
 
 # 재시도하지 않는다. 응답 유실 시 서버 데이터가 이미 생성됐을 수 있다.
 curl --fail-with-body --silent --show-error --max-time 600 \
-  -H "X-Internal-Api-Key: $INTERNAL_API_KEY" -H 'Content-Type: application/json' \
+  -H "X-Internal-Api-Key: $INTERNAL_API_KEY" -H "x-loadtest: $LOADTEST_TOKEN" \
+  -H 'Content-Type: application/json' \
   --data "$payload" "$base/seed" -o "$output_dir/manifest.json"
 jq -e '.runId and (.products | length > 0)' "$output_dir/manifest.json" >/dev/null
 
@@ -36,7 +38,8 @@ MANIFEST="$output_dir/manifest.json" k6 run --include-system-env-vars=true \
 deadline=$((SECONDS + verify_timeout))
 while true; do
   curl --fail-with-body --silent --show-error --max-time 120 \
-    -H "X-Internal-Api-Key: $INTERNAL_API_KEY" -H 'Content-Type: application/json' \
+    -H "X-Internal-Api-Key: $INTERNAL_API_KEY" -H "x-loadtest: $LOADTEST_TOKEN" \
+    -H 'Content-Type: application/json' \
     --data-binary "@$output_dir/manifest.json" "$base/verify" -o "$output_dir/verification.json"
   if jq -e '.passed == true' "$output_dir/verification.json" >/dev/null; then
     jq '{passed,expectedOrders,actualOrders}' "$output_dir/verification.json"

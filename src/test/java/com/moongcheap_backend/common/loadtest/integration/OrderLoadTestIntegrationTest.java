@@ -13,6 +13,7 @@ import com.moongcheap_backend.order.application.GroupBuyOrderCreationConsumer;
 import com.moongcheap_backend.support.integration.AbstractIntegrationTest;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,6 +94,33 @@ class OrderLoadTestIntegrationTest extends AbstractIntegrationTest {
             .isInstanceOf(ResponseStatusException.class);
     }
 
+    @Test void bulkCleanupRemovesMultipleRunsAndPreservesUnrequestedRun() {
+        var first = service.seed(1, 2);
+        var second = service.seed(2, 1);
+        var untouched = service.seed(1, 1);
+        service.create(first.runId(), first.products().getFirst().productId());
+        second.products().forEach(product -> service.create(second.runId(), product.productId()));
+        publisher.publishBatch(LocalDateTime.now(ZoneId.of("Asia/Seoul")).plusMinutes(1), 100);
+        consumer.consume();
+
+        var result = service.cleanupBulk(List.of(first.runId(), second.runId()));
+
+        assertThat(result.runs()).isEqualTo(2);
+        assertThat(result.products()).isEqualTo(3);
+        assertThat(result.groupBuys()).isEqualTo(3);
+        assertThat(result.orders()).isEqualTo(4);
+        assertThat(result.demands()).isEqualTo(4);
+        assertThat(jdbc.queryForObject("select count(*) from product where description in (?, ?)",
+            Integer.class, "load-test-order:" + first.runId(),
+            "load-test-order:" + second.runId())).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from product where description=?",
+            Integer.class, "load-test-order:" + untouched.runId())).isEqualTo(1);
+        assertThatThrownBy(() -> service.cleanupBulk(List.of(untouched.runId(), untouched.runId())))
+            .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> service.cleanupBulk(List.of(UUID.randomUUID())))
+            .isInstanceOf(ResponseStatusException.class);
+    }
+
     private OrderLoadTestService.Report awaitPassed(OrderLoadTestService.Manifest manifest) {
         long deadline = System.nanoTime() + java.time.Duration.ofSeconds(5).toNanos();
         OrderLoadTestService.Report report;
@@ -117,5 +145,8 @@ class OrderLoadTestIntegrationTest extends AbstractIntegrationTest {
             .header("X-Internal-Api-Key", "test-internal-api-key")
             .contentType("application/json").content("{\"groups\":1,\"demandsPerGroup\":1}"))
             .andExpect(status().isOk());
+        mockMvc.perform(post("/api/load-tests/internal/orders/cleanup-bulk")
+            .contentType("application/json").content("{\"runIds\":[]}"))
+            .andExpect(status().isUnauthorized());
     }
 }

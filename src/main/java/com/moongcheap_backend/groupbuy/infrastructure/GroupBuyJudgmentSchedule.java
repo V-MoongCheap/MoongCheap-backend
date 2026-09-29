@@ -47,6 +47,12 @@ public class GroupBuyJudgmentSchedule {
         redisTemplate.opsForZSet().remove(KEY, member);
     }
 
+    public void removeAll(Set<Long> groupBuyIds) {
+        if (groupBuyIds.isEmpty()) return;
+        redisTemplate.opsForZSet().remove(KEY,
+            groupBuyIds.stream().map(String::valueOf).toArray());
+    }
+
     private double toEpochMillis(LocalDateTime dateTime) {
         return dateTime.atZone(ZONE_SEOUL).toInstant().toEpochMilli();
     }
