@@ -1,5 +1,6 @@
 package com.moongcheap_backend.order.application;
 
+import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import com.moongcheap_backend.common.crypto.EncryptionService;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
@@ -36,14 +37,17 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class OrderService {
+    private final LoadTestMetrics metrics;
 
     private static final int ORDER_BATCH_SIZE = 20;
     private static final Set<OrderStatus> SUMMARY_STATUSES = Set.of(
@@ -74,20 +78,28 @@ public class OrderService {
 
         //seller, product 검증
         if (seller.getDeletedAt() != null) {
-            throw new BusinessException(ErrorCode.SELLER_NOT_FOUND);
+            throw orderCreationRejected(groupBuyId, seller, product,
+                ErrorCode.SELLER_NOT_FOUND, "SELLER_DELETED");
         }
         if (!seller.isSellable()) {
-            throw new BusinessException(ErrorCode.SELLER_NOT_APPROVED);
+            throw orderCreationRejected(groupBuyId, seller, product,
+                ErrorCode.SELLER_NOT_APPROVED, "SELLER_NOT_SELLABLE");
         }
         if (!product.isOnSale()) {
-            throw new BusinessException(ErrorCode.PRODUCT_NOT_ORDERABLE);
+            throw orderCreationRejected(groupBuyId, seller, product,
+                ErrorCode.PRODUCT_NOT_ORDERABLE, "PRODUCT_NOT_ON_SALE");
         }
-        if (!product.getSellerId().equals(seller.getId())
-            || product.getThumbnailUrl() == null
-            || product.getThumbnailUrl().isBlank()
-            || product.getUnitPrice() == null
-            || product.getShippingFee() == null) {
-            throw new BusinessException(ErrorCode.PRODUCT_NOT_ORDERABLE);
+        if (!product.getSellerId().equals(seller.getId())) {
+            throw orderCreationRejected(groupBuyId, seller, product,
+                ErrorCode.PRODUCT_NOT_ORDERABLE, "PRODUCT_SELLER_MISMATCH");
+        }
+        if (product.getUnitPrice() == null) {
+            throw orderCreationRejected(groupBuyId, seller, product,
+                ErrorCode.PRODUCT_NOT_ORDERABLE, "PRODUCT_UNIT_PRICE_MISSING");
+        }
+        if (product.getShippingFee() == null) {
+            throw orderCreationRejected(groupBuyId, seller, product,
+                ErrorCode.PRODUCT_NOT_ORDERABLE, "PRODUCT_SHIPPING_FEE_MISSING");
         }
 
         //demand_board_id로 demand에서 대상 추출
@@ -137,7 +149,18 @@ public class OrderService {
 
         // 실제 주문으로 생성된 수요만 공동구매 참여 인원에 반영한다.
         groupBuy.increaseParticipantCount(orders.size());
+        metrics.committed("order", "created", orders.size(), groupBuy.getCreatedAt());
         return null;
+    }
+
+    // 외부 오류 코드는 유지하면서 운영 로그에서는 실제 검증 실패 조건을 구분한다.
+    private BusinessException orderCreationRejected(Long groupBuyId, Seller seller,
+        Product product, ErrorCode errorCode, String reason) {
+        log.warn("Order creation rejected: groupBuyId={}, sellerId={}, productId={}, "
+                + "productSellerId={}, sellerStatus={}, productStatus={}, errorCode={}, reason={}",
+            groupBuyId, seller.getId(), product.getId(), product.getSellerId(),
+            seller.getStatus(), product.getStatus(), errorCode, reason);
+        return new BusinessException(errorCode);
     }
 
     private BrandPayMethod getBrandPayMethodReference(Long payMethodId) {

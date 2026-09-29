@@ -1,5 +1,6 @@
 package com.moongcheap_backend.order.application;
 
+import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,6 +42,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
@@ -53,6 +56,7 @@ import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceUnitTest {
+    @org.mockito.Mock private LoadTestMetrics metrics;
 
     private static final Long MEMBER_ID = 1L;
     private static final String ORDER_NO = "ORD-TEST";
@@ -128,6 +132,28 @@ class OrderServiceUnitTest {
     class AutoCreateOrderTest {
 
         private GroupBuy preparedGroupBuy;
+
+        @ParameterizedTest
+        @NullAndEmptySource
+        @ValueSource(strings = {" "})
+        void 상품_썸네일이_없어도_주문을_생성한다(String thumbnailUrl) {
+            Demand demand = org.mockito.Mockito.mock(Demand.class);
+            when(demand.getId()).thenReturn(100L);
+            when(demand.getMemberId()).thenReturn(1L);
+            when(demand.getQuantity()).thenReturn(2);
+            when(demand.getDesiredPriceMax()).thenReturn(10_000);
+            Product product = prepareOrderSource(List.of(demand));
+            when(product.getThumbnailUrl()).thenReturn(thumbnailUrl);
+
+            orderService.autoCreateOrder(10L);
+
+            verify(ordersRepository).saveAll(ordersCaptor.capture());
+            assertThat(ordersCaptor.getValue()).hasSize(1);
+            Orders order = ordersCaptor.getValue().getFirst();
+            assertThat(order.getImageUrl()).isEqualTo(thumbnailUrl);
+            assertThat(order.getTotalAmount()).isEqualTo(23_000);
+            verify(preparedGroupBuy).increaseParticipantCount(1);
+        }
 
         @Test
         void 수요_40건을_주문으로_변환해_20건씩_나누어_저장한다() {
@@ -452,7 +478,6 @@ class OrderServiceUnitTest {
             when(seller.getId()).thenReturn(20L);
             when(product.isOnSale()).thenReturn(true);
             when(product.getSellerId()).thenReturn(20L);
-            when(product.getThumbnailUrl()).thenReturn("https://example.com/image.jpg");
             when(product.getUnitPrice()).thenReturn(10_000);
             when(product.getShippingFee()).thenReturn(3_000);
             when(product.getDemandBoardId()).thenReturn(30L);
@@ -506,7 +531,6 @@ class OrderServiceUnitTest {
             when(seller.getId()).thenReturn(20L);
             when(product.isOnSale()).thenReturn(true);
             when(product.getSellerId()).thenReturn(20L);
-            when(product.getThumbnailUrl()).thenReturn("https://example.com/image.jpg");
             when(product.getUnitPrice()).thenReturn(10_000);
             when(product.getShippingFee()).thenReturn(3_000);
             when(product.getDemandBoardId()).thenReturn(30L);
