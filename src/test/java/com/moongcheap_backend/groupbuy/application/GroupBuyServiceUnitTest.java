@@ -1,5 +1,6 @@
 package com.moongcheap_backend.groupbuy.application;
 
+import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
@@ -31,6 +32,7 @@ import org.springframework.data.domain.Pageable;
  */
 @ExtendWith(MockitoExtension.class)
 class GroupBuyServiceUnitTest {
+    @org.mockito.Mock private LoadTestMetrics metrics;
 
     @Mock
     private GroupBuyRepository groupBuyRepository;

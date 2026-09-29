@@ -77,6 +77,8 @@ public class SecurityConfig {
                     "/api/products-search/internal",
                     "/api/demand-boards/internal/**",
                     "/api/awarding/**",
+                    // InternalApiKeyFilter와 테스트 컨트롤러의 키 검증으로 보호한다.
+                    "/api/load-tests/internal/**",
                     "/actuator/health",
                     "/actuator/prometheus"
                 ).permitAll()

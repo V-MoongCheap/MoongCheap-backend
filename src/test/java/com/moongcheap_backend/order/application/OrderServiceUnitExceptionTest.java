@@ -1,5 +1,6 @@
 package com.moongcheap_backend.order.application;
 
+import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
@@ -43,6 +44,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class OrderServiceUnitExceptionTest {
+    @org.mockito.Mock private LoadTestMetrics metrics;
 
     private static final Long MEMBER_ID = 1L;
     private static final String ORDER_NO = "ORD-TEST";

@@ -1,5 +1,6 @@
 package com.moongcheap_backend.payments.application;
 
+import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import com.moongcheap_backend.common.outbox.domain.*;
@@ -16,7 +17,7 @@ class PaymentOutboxPublishServiceUnitTest {
         PaymentsRepository payments = mock(PaymentsRepository.class);
         OutboxEventRepository outbox = mock(OutboxEventRepository.class);
         PaymentSchedule schedule = mock(PaymentSchedule.class);
-        PaymentOutboxPublishService service = new PaymentOutboxPublishService(payments, outbox, schedule);
+        PaymentOutboxPublishService service = new PaymentOutboxPublishService(mock(LoadTestMetrics.class), payments, outbox, schedule);
         Payments payment = mock(Payments.class);
         when(payment.isAutomaticallyExecutable()).thenReturn(true);
         when(payment.getId()).thenReturn(200L);

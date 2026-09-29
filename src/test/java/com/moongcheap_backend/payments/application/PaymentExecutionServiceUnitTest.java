@@ -1,5 +1,6 @@
 package com.moongcheap_backend.payments.application;
 
+import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 import com.moongcheap_backend.common.outbox.domain.*;
@@ -24,7 +25,7 @@ class PaymentExecutionServiceUnitTest {
     OutboxEventRepository outbox = mock(OutboxEventRepository.class);
     PaymentQueueProperties properties = new PaymentQueueProperties();
     OrderDemandService demands = mock(OrderDemandService.class);
-    PaymentExecutionService service = new PaymentExecutionService(orders, payments, outbox, properties, demands);
+    PaymentExecutionService service = new PaymentExecutionService(mock(LoadTestMetrics.class), orders, payments, outbox, properties, demands);
     Payments payment;
     OutboxEvent event;
 
@@ -83,6 +84,36 @@ class PaymentExecutionServiceUnitTest {
         assertThat(payment.getOrders().getOrderStatus()).isEqualTo(OrderStatus.PAYMENT_COMPLETED);
         verify(demands).closeAfterPayment(10L);
         assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
+    }
+
+    @Test void 통신오류는_UNKNOWN을_유지하고_소유권을_해제한_뒤_재시도를_예약한다() {
+        var work = service.begin(200L).orElseThrow();
+        service.handleError(200L, work.processingToken(), new PaymentGatewayException(
+            PaymentGatewayException.Kind.UNKNOWN, "GATEWAY_TRANSPORT_ERROR"), false);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.UNKNOWN);
+        assertThat(payment.getOrders().getOrderStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
+        assertThat(payment.getProcessingToken()).isNull();
+        assertThat(payment.getProcessingDeadline()).isNull();
+        assertThat(payment.getAttemptCount()).isEqualTo(1);
+        assertThat(event.getStatus()).isEqualTo(OutboxEventStatus.PENDING);
+        var now = LocalDateTime.ofInstant(NOW, ZoneId.of("Asia/Seoul"));
+        assertThat(event.getScheduledAt()).isBetween(now.plusSeconds(11), now.plusSeconds(15));
+        verify(outbox).save(event);
+        verifyNoInteractions(demands);
+    }
+
+    @Test void 마지막_시도의_통신오류는_자동재시도를_중단한다() {
+        ReflectionTestUtils.setField(payment, "attemptCount", properties.getMaxAttempts() - 1);
+        var work = service.begin(200L).orElseThrow();
+        service.handleError(200L, work.processingToken(), new PaymentGatewayException(
+            PaymentGatewayException.Kind.UNKNOWN, "GATEWAY_TRANSPORT_ERROR"), false);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentsStatus.REVIEW_REQUIRED);
+        assertThat(payment.isAutomaticallyExecutable()).isFalse();
+        assertThat(payment.getProcessingToken()).isNull();
+        assertThat(payment.getProcessingDeadline()).isNull();
+        assertThat(payment.getOrders().getOrderStatus()).isEqualTo(OrderStatus.PAYMENT_PENDING);
     }
 
     @Test void 승인금액이_다르면_수요를_종료하지_않는다() {

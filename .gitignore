@@ -61,3 +61,5 @@ docs/demand-board-refactoring-full-log.md
 
 ### Local seed (EXPLAIN 검증 용도, 커밋 제외) ###
 src/main/resources/db/seed/pending_awarding_seed.sql
+# 로컬 부하테스트 manifest 및 결과
+/tools/load-test/results/
