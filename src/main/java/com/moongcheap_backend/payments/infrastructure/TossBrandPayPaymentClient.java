@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -25,8 +24,6 @@ import static com.moongcheap_backend.payments.infrastructure.PaymentGatewayExcep
 /** 서버 시크릿 키로 토스 브랜드페이 자동결제 API를 호출한다. */
 @Slf4j
 @Component
-@ConditionalOnProperty(
-    name = "moongcheap.payments.gateway.mode", havingValue = "toss", matchIfMissing = true)
 public class TossBrandPayPaymentClient implements BrandPayPaymentClient,
     PaymentReconciliationClient, PaymentCancellationClient {
 

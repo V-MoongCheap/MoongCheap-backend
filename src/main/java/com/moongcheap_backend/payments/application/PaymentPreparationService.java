@@ -1,6 +1,5 @@
 package com.moongcheap_backend.payments.application;
 
-import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import com.moongcheap_backend.common.outbox.domain.OutboxEvent;
 import com.moongcheap_backend.common.outbox.infrastructure.OutboxEventRepository;
 import com.moongcheap_backend.common.exception.BusinessException;
@@ -27,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class PaymentPreparationService {
-    private final LoadTestMetrics metrics;
     private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
 
     private final OrdersRepository ordersRepository;
@@ -69,12 +67,9 @@ public class PaymentPreparationService {
             order.setOrderStatus(OrderStatus.PAYMENT_FAILED);
         }
 
-        LocalDateTime now = LocalDateTime.now(ZONE_SEOUL);
-        payment.recordInitialSchedule(now);
         paymentsRepository.saveAndFlush(payment);
+        LocalDateTime now = LocalDateTime.now(ZONE_SEOUL);
         outboxRepository.save(OutboxEvent.paymentScheduleSync(payment.getId(), now, now));
-        metrics.committed("payment_preparation", valid ? "scheduled" : "failed", 1, order.getGroupBuy().getJudgedAt());
-        if (!valid) metrics.committed("payment", "failed", 1, null);
         return payment.getId();
     }
 }

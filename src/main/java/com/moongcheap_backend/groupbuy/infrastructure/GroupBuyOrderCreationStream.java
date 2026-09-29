@@ -3,7 +3,6 @@ package com.moongcheap_backend.groupbuy.infrastructure;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -34,11 +33,6 @@ public class GroupBuyOrderCreationStream {
             if acknowledged == 0 then
                 return 0
             end
-            return redis.call('XDEL', KEYS[1], ARGV[2])
-            """, Long.class);
-    private static final DefaultRedisScript<Long> DISCARD_SCRIPT =
-        new DefaultRedisScript<>("""
-            pcall(redis.call, 'XACK', KEYS[1], ARGV[1], ARGV[2])
             return redis.call('XDEL', KEYS[1], ARGV[2])
             """, Long.class);
 
@@ -118,28 +112,6 @@ public class GroupBuyOrderCreationStream {
             throw new IllegalArgumentException("groupBuyId is missing");
         }
         return Long.valueOf(value.toString());
-    }
-
-    /** 테스트 데이터 정리 시 지정 공동구매의 메시지만 ACK 후 삭제한다. */
-    public long discardForGroupBuys(Set<Long> groupBuyIds) {
-        if (groupBuyIds.isEmpty()) return 0;
-        List<MapRecord<String, Object, Object>> records = redisTemplate.opsForStream()
-            .range(KEY, Range.unbounded());
-        if (records == null || records.isEmpty()) return 0;
-        long removed = 0;
-        for (var record : records) {
-            Long groupBuyId;
-            try {
-                groupBuyId = getGroupBuyId(record);
-            } catch (IllegalArgumentException exception) {
-                continue;
-            }
-            if (!groupBuyIds.contains(groupBuyId)) continue;
-            Long result = redisTemplate.execute(DISCARD_SCRIPT, List.of(KEY),
-                CONSUMER_GROUP, record.getId().getValue());
-            if (result != null) removed += result;
-        }
-        return removed;
     }
 
     /*

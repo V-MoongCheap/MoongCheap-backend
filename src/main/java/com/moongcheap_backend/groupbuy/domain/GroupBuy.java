@@ -58,13 +58,6 @@ public class GroupBuy extends BaseTimeEntity {
     @Column(name = "status", nullable = false, length = 30)
     private GroupBuyStatus status;
 
-    @Column(name = "judged_at")
-    private LocalDateTime judgedAt;
-
-    public void recordJudgedAt(LocalDateTime now) {
-        if (judgedAt == null) judgedAt = now;
-    }
-
     public GroupBuy(
         Seller seller,
         Product product,

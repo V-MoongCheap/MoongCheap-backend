@@ -1,6 +1,5 @@
 package com.moongcheap_backend.groupbuy.application;
 
-import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -34,7 +33,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("공동구매 생성 - 해피 케이스")
 class GroupBuyCreationServiceUnitTest {
-    @org.mockito.Mock private LoadTestMetrics metrics;
 
     @Mock
     private GroupBuyRepository groupBuyRepository;

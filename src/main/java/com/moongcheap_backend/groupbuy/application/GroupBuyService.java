@@ -1,6 +1,5 @@
 package com.moongcheap_backend.groupbuy.application;
 
-import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.common.outbox.domain.OutboxEvent;
@@ -27,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class GroupBuyService {
-    private final LoadTestMetrics metrics;
 
     private static final long JUDGMENT_DELAY_MINUTES = 5;
     private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
@@ -88,7 +86,6 @@ public class GroupBuyService {
             now
         ));
 
-        metrics.committed("group_buy", "created", 1, null);
         return null;
     }
 

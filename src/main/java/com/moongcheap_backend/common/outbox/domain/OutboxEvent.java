@@ -60,9 +60,6 @@ public class OutboxEvent extends BaseTimeEntity {
     @Column(name = "published_at")
     private LocalDateTime publishedAt;
 
-    @Column(name = "pending_since")
-    private LocalDateTime pendingSince;
-
     private OutboxEvent(
         OutboxEventType eventType,
         Long aggregateId,
@@ -75,7 +72,6 @@ public class OutboxEvent extends BaseTimeEntity {
         this.status = OutboxEventStatus.PENDING;
         this.retryCount = 0;
         this.nextAttemptAt = nextAttemptAt;
-        this.pendingSince = nextAttemptAt;
     }
 
     // GroupBuy와 같은 DB 트랜잭션에서 생성해 Redis 등록 요청의 유실을 막는다.
@@ -123,7 +119,6 @@ public class OutboxEvent extends BaseTimeEntity {
         if (eventType != OutboxEventType.PAYMENT_SCHEDULE_SYNC) {
             throw new IllegalStateException("결제 Outbox만 재예약할 수 있습니다.");
         }
-        if (this.status != OutboxEventStatus.PENDING) this.pendingSince = now;
         this.scheduledAt = scheduledAt;
         this.status = OutboxEventStatus.PENDING;
         this.retryCount = 0;

@@ -6,21 +6,6 @@ import java.util.concurrent.*;
 import org.junit.jupiter.api.Test;
 
 class PaymentWorkerPoolUnitTest {
-    @Test void worker만_비활성화하면_작업을_획득하지_않는다() {
-        PaymentWorker worker = mock(PaymentWorker.class);
-        PaymentQueueProperties properties = new PaymentQueueProperties();
-        properties.setEnabled(true);
-        properties.setWorkerEnabled(false);
-        PaymentWorkerPool pool = new PaymentWorkerPool(worker, properties);
-        try {
-            pool.poll();
-            verifyNoInteractions(worker);
-            assertThat(properties.isEnabled()).isTrue();
-        } finally {
-            pool.close();
-        }
-    }
-
     @Test void 기본_한_슬롯만_실행하고_대기열을_쌓지_않는다() throws Exception {
         PaymentWorker worker = mock(PaymentWorker.class);
         PaymentQueueProperties properties = new PaymentQueueProperties();
