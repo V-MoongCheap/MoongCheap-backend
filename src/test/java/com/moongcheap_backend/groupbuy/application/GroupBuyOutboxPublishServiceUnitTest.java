@@ -1,5 +1,6 @@
 package com.moongcheap_backend.groupbuy.application;
 
+import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -25,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  */
 @ExtendWith(MockitoExtension.class)
 class GroupBuyOutboxPublishServiceUnitTest {
+    @org.mockito.Mock private LoadTestMetrics metrics;
 
     @Mock
     private OutboxEventRepository outboxEventRepository;

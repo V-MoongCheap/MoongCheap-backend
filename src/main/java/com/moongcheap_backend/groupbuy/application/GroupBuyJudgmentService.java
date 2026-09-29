@@ -1,5 +1,6 @@
 package com.moongcheap_backend.groupbuy.application;
 
+import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.groupbuy.domain.GroupBuy;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class GroupBuyJudgmentService {
+    private final LoadTestMetrics metrics;
 
     private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
 
@@ -39,12 +41,15 @@ public class GroupBuyJudgmentService {
                 groupBuyId, GroupBuyStatus.OPEN, now)
             .orElseThrow(() -> new BusinessException(ErrorCode.GROUPBUY_NOT_FOUND));
 
+        groupBuy.recordJudgedAt(now);
         if (groupBuy.getCount() >= groupBuy.getTargetCount()) {
             groupBuy.completeRecruitment();
+            metrics.committed("judgment", "success", 1, groupBuy.getGroupBuyEndAt().plusMinutes(5));
             return true;
         }
 
         groupBuy.fail();
+        metrics.committed("judgment", "failed", 1, groupBuy.getGroupBuyEndAt().plusMinutes(5));
         return false;
     }
 }

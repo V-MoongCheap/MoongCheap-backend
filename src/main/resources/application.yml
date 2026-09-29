@@ -43,6 +43,9 @@ management:
       exposure:
         include: health, prometheus
   metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
     tags:
       application: ${spring.application.name}
 
@@ -81,9 +84,20 @@ resilience4j:
         record-failure-predicate: com.moongcheap_backend.common.config.OpenSearchFailurePredicate
 
 moongcheap:
+  load-test:
+    enabled: ${LOAD_TEST_ENABLED:false}
+  metrics:
+    backlog:
+      enabled: ${METRICS_BACKLOG_ENABLED:true}
+      interval-ms: ${METRICS_BACKLOG_INTERVAL_MS:15000}
   payments:
+    gateway:
+      mode: ${PAYMENT_GATEWAY_MODE:toss}
+      mock-delay: ${PAYMENT_MOCK_DELAY:300ms}
     queue:
       enabled: ${PAYMENT_QUEUE_ENABLED:false}
+      # 예약 생성/발행은 유지하고 Worker의 신규 획득만 제어한다.
+      worker-enabled: ${PAYMENT_WORKER_ENABLED:true}
       workers: 1
       poll-delay-ms: 1000
       visibility-delay: 60s

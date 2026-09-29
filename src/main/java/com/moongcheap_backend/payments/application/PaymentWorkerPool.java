@@ -29,11 +29,13 @@ public class PaymentWorkerPool {
             new SynchronousQueue<>(), task -> new Thread(task,
                 "payment-worker-" + sequence.incrementAndGet()),
             new ThreadPoolExecutor.AbortPolicy());
+        log.info("Payment worker pool configured: workers={}, workerEnabled={}",
+            workers, properties.isWorkerEnabled());
     }
 
     @Scheduled(fixedDelayString = "${moongcheap.payments.queue.poll-delay-ms:1000}")
     public void poll() {
-        if (executor.isShutdown()) return;
+        if (!properties.isWorkerEnabled() || executor.isShutdown()) return;
         for (int i = 0; i < workers && slots.tryAcquire(); i++) {
             try {
                 executor.execute(() -> {

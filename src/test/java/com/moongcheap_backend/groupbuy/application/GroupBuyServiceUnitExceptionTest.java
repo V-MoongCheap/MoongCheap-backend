@@ -1,5 +1,6 @@
 package com.moongcheap_backend.groupbuy.application;
 
+import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
@@ -20,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  */
 @ExtendWith(MockitoExtension.class)
 class GroupBuyServiceUnitExceptionTest {
+    @org.mockito.Mock private LoadTestMetrics metrics;
 
     @Mock
     private GroupBuyRepository groupBuyRepository;

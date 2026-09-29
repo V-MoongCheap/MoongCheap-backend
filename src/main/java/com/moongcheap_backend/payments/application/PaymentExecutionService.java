@@ -1,5 +1,6 @@
 package com.moongcheap_backend.payments.application;
 
+import com.moongcheap_backend.common.metrics.LoadTestMetrics;
 import com.moongcheap_backend.common.outbox.domain.OutboxEvent;
 import com.moongcheap_backend.demand.application.demand.OrderDemandService;
 import com.moongcheap_backend.common.outbox.domain.OutboxEventType;
@@ -33,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class PaymentExecutionService {
+    private final LoadTestMetrics metrics;
     private static final ZoneId ZONE_SEOUL = ZoneId.of("Asia/Seoul");
     private final OrdersRepository ordersRepository;
     private final PaymentsRepository paymentsRepository;
@@ -59,7 +61,9 @@ public class PaymentExecutionService {
         OutboxEvent outbox = outboxRepository.findByTypeAndAggregateIdForUpdate(
             OutboxEventType.PAYMENT_SCHEDULE_SYNC, paymentId).orElse(null);
         if (outbox == null) {
+            boolean executable = payment.isAutomaticallyExecutable();
             payment.requireReview();
+            if (executable) metrics.committed("payment", "review_required", 1, payment.getInitialScheduledAt());
             outboxRepository.save(OutboxEvent.paymentScheduleSync(paymentId, now, now));
             return Optional.empty();
         }
@@ -78,6 +82,7 @@ public class PaymentExecutionService {
             || payment.getCreatedAt() == null
             || !now.isBefore(payment.getCreatedAt().plus(properties.getReplayWindow()))) {
             payment.requireReview();
+            metrics.committed("payment", "review_required", 1, payment.getInitialScheduledAt());
             outbox.requestPaymentSync(now, now);
             return Optional.empty();
         }
@@ -85,6 +90,7 @@ public class PaymentExecutionService {
         if (method == null || payment.getCustomerKeySnapshot() == null
             || payment.getIdempotencyKey() == null || payment.getTotalAmount() == null) {
             payment.requireReview();
+            metrics.committed("payment", "review_required", 1, payment.getInitialScheduledAt());
             outbox.requestPaymentSync(now, now);
             return Optional.empty();
         }
@@ -94,6 +100,7 @@ public class PaymentExecutionService {
             || !method.getMember().getId().equals(order.get().getMemberId())
             || order.get().getOrderStatus() != OrderStatus.PAYMENT_PENDING)) {
             payment.fail();
+            metrics.committed("payment", "failed", 1, payment.getInitialScheduledAt());
             order.get().setOrderStatus(OrderStatus.PAYMENT_FAILED);
             outbox.requestPaymentSync(now, now);
             return Optional.empty();
@@ -101,12 +108,14 @@ public class PaymentExecutionService {
         if (!reconciliation && order.get().getGroupBuy().getStatus()
             != GroupBuyStatus.RECRUITMENT_COMPLETED) {
             payment.fail();
+            metrics.committed("payment", "failed", 1, payment.getInitialScheduledAt());
             order.get().setOrderStatus(OrderStatus.PAYMENT_FAILED);
             outbox.requestPaymentSync(now, now);
             return Optional.empty();
         }
         UUID token = UUID.randomUUID();
         payment.begin(token, instant, properties.getLease());
+        metrics.committed("payment_attempt", reconciliation ? "reconciliation" : "initial", 1, null);
         return Optional.of(new Execution(paymentId, token, new AutomaticPaymentRequest(
             payment.getCustomerKeySnapshot(), method.getMethodKey(),
             payment.getMethod() == PaymentsMethod.CARD ? PaymentType.CARD : PaymentType.ACCOUNT,
@@ -155,6 +164,7 @@ public class PaymentExecutionService {
             .atZoneSameInstant(ZONE_SEOUL).toLocalDateTime());
         payment.getOrders().setOrderStatus(OrderStatus.PAYMENT_COMPLETED);
         orderDemandService.closeAfterPayment(payment.getOrders().getDemandId());
+        metrics.committed("payment", "succeeded", 1, payment.getInitialScheduledAt());
         sync(paymentId, nowLocal());
     }
 
@@ -170,6 +180,7 @@ public class PaymentExecutionService {
             paymentId, error.kind(), error.code());
         if (error.kind() == PaymentGatewayException.Kind.DECLINED && !reconciliation) {
             payment.fail();
+            metrics.committed("payment", "failed", 1, payment.getInitialScheduledAt());
             if (payment.getOrders().getOrderStatus() == OrderStatus.PAYMENT_PENDING) {
                 payment.getOrders().setOrderStatus(OrderStatus.PAYMENT_FAILED);
             }
@@ -187,11 +198,13 @@ public class PaymentExecutionService {
         long delay = delays[Math.min(payment.getAttemptCount() - 1, delays.length - 1)]
             + ThreadLocalRandom.current().nextLong(1, 6);
         payment.releaseForRetry();
+        metrics.committed("payment_retry", "scheduled", 1, null);
         sync(paymentId, nowLocal().plusSeconds(delay));
     }
 
     private void requireReview(Payments payment, LocalDateTime now) {
         payment.requireReview();
+        metrics.committed("payment", "review_required", 1, payment.getInitialScheduledAt());
         sync(payment.getId(), now);
     }
 
