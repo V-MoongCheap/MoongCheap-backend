@@ -27,7 +27,9 @@ jobs:
       issues: write
       id-token: write
     env:
-      GH_TOKEN: ${{ github.token }}
+      # Org 의 Workflow permissions 가 Read-only 로 잠겨 있어 github.token 대신 PAT 사용.
+      # TRIAGE_BOT_TOKEN 은 Contents/PR/Issues R/W 가 있는 fine-grained PAT.
+      GH_TOKEN: ${{ secrets.TRIAGE_BOT_TOKEN }}
       ISSUE_NUMBER: ${{ github.event.issue.number }}
     steps:
       - uses: actions/checkout@v4
@@ -47,6 +49,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.TRIAGE_BOT_TOKEN }}
           prompt: |
             저장소 ${{ github.repository }} 의 이슈 #${{ github.event.issue.number }} 는 운영 로그 트리아지 봇이 만든 것입니다.
             `gh issue view ${{ github.event.issue.number }}` 로 내용을 읽으세요.
@@ -65,6 +68,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.TRIAGE_BOT_TOKEN }}
           prompt: |
             저장소 ${{ github.repository }} 의 이슈 #${{ github.event.issue.number }} 는 운영 로그 트리아지 봇이 만든 것입니다.
             `gh issue view ${{ github.event.issue.number }}` 로 내용을 읽으세요.
