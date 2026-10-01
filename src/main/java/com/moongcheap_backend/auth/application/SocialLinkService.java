@@ -8,6 +8,7 @@ import com.moongcheap_backend.member.domain.SocialCredential;
 import com.moongcheap_backend.member.domain.SocialProvider;
 import com.moongcheap_backend.member.infrastructure.LocalCredentialRepository;
 import com.moongcheap_backend.member.infrastructure.SocialCredentialRepository;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,28 +25,32 @@ public class SocialLinkService {
 
     @Transactional
     public void link(Long memberId, SocialProvider provider, String providerId) {
-        socialCredentialRepository.findByProviderAndProviderId(provider, providerId)
-                .ifPresent(existing -> {
-                    if (!existing.getMemberId().equals(memberId)) {
-                        throw new BusinessException(ErrorCode.SOCIAL_ALREADY_LINKED);
-                    }
-                });
-        if (socialCredentialRepository.findByMemberIdAndProvider(memberId, provider).isPresent()) {
+        Optional<SocialCredential> existing = socialCredentialRepository.findByProviderAndProviderId(
+            provider, providerId);
+        if (existing.isPresent()) {
+            if (!existing.get().getMemberId().equals(memberId)) {
+                throw new BusinessException(ErrorCode.SOCIAL_ALREADY_LINKED);
+            }
             return;
         }
+        if (socialCredentialRepository.findByMemberIdAndProvider(memberId, provider).isPresent()) {
+            throw new BusinessException(ErrorCode.SOCIAL_ALREADY_LINKED);
+        }
         socialCredentialRepository.save(SocialCredential.builder()
-                .memberId(memberId)
-                .provider(provider)
-                .providerId(providerId)
-                .build());
+            .memberId(memberId)
+            .provider(provider)
+            .providerId(providerId)
+            .build());
     }
 
     // 마지막 로그인 수단 검사가 count 기반이라 phantom read 방지를 위해 Advisory Lock 사용
     @Transactional
     public void unlink(Long memberId, SocialProvider provider) {
-        advisoryLockAdaptor.acquireXactLock(AdvisoryLockKeys.credentialWrite(memberId), CREDENTIAL_LOCK_TIMEOUT);
-        SocialCredential target = socialCredentialRepository.findByMemberIdAndProvider(memberId, provider)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        advisoryLockAdaptor.acquireXactLock(AdvisoryLockKeys.credentialWrite(memberId),
+            CREDENTIAL_LOCK_TIMEOUT);
+        SocialCredential target = socialCredentialRepository.findByMemberIdAndProvider(memberId,
+                provider)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
         long socialCount = socialCredentialRepository.countByMemberId(memberId);
         boolean hasLocal = localCredentialRepository.existsByMemberId(memberId);
         int remainingCredentials = (int) socialCount - 1 + (hasLocal ? 1 : 0);

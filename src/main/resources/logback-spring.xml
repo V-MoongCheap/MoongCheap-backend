@@ -1,0 +1,16 @@
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+  <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+      <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+        <maxDepthPerThrowable>200</maxDepthPerThrowable>
+        <rootCauseFirst>true</rootCauseFirst>
+      </throwableConverter>
+      <provider class="net.logstash.logback.composite.loggingevent.StackHashJsonProvider"/>
+      <provider class="net.logstash.logback.composite.loggingevent.RawMessageJsonProvider"/>
+    </encoder>
+  </appender>
+
+  <root level="INFO"><appender-ref ref="JSON"/></root>
+</configuration>

@@ -38,8 +38,26 @@ out/
 
 ### Local only ###
 docs/concurrency.md
+docs/demand-query.md
+docs/demand-board-query-index.md
+docs/transaction-timeout.md
+docs/demand-expire-batch.md
+docs/product-search-decisions.md
+docs/product-search.md
+docs/ai-awarding-flow.md
+docs/failure-handling-audit.md
+docs/formation-plan-orphan-board-analysis.md
+docs/nested-to-requires-new-migration-decision.md
+docs/nested-transaction-substitute-offer-analysis.md
+docs/retry-and-logging.md
+docs/demand-board-service-chunk-refactoring.md
+docs/identity-to-sequence-decision.md
+docs/demand-board-refactoring-full-log.md
 
 ### Environment ###
 .env
 .env.*
 !.env.example
+
+### Local seed (EXPLAIN 검증 용도, 커밋 제외) ###
+src/main/resources/db/seed/pending_awarding_seed.sql

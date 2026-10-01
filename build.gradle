@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'jacoco'
     id 'org.springframework.boot' version '4.1.0'
     id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -31,10 +32,17 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
     implementation 'me.paulschwarz:springboot4-dotenv:5.1.0'
     implementation 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+    implementation 'org.aspectj:aspectjweaver'
+    implementation 'io.github.resilience4j:resilience4j-spring-boot4:2.4.0'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
+    implementation 'org.opensearch.client:opensearch-java:2.11.0'
+    implementation 'org.apache.httpcomponents.client5:httpclient5:5.4.4'
+    implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
 
     runtimeOnly 'org.postgresql:postgresql'
 
@@ -47,12 +55,62 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-session-data-redis-test'
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:junit-jupiter:1.20.4'
+    testImplementation 'org.testcontainers:postgresql:1.20.4'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
+springBoot {
+    buildInfo()
 }
 
+tasks.named('processResources') {
+    from('tools/brandpay-test') {
+        include 'index.html', 'app.js', 'styles.css'
+        into 'static/brandpay-test'
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    systemProperty 'user.timezone', 'Asia/Seoul'
+
+    // Docker(Testcontainers)가 없는 CI 환경에서는 -PskipContainerTests로 통합/동시성 테스트 스킵
+    if (project.hasProperty('skipContainerTests')) {
+        exclude '**/integration/**'
+        exclude '**/concurrency/**'
+        exclude '**/MoongCheapBackendApplicationTests.class'
+        exclude '**/*RedisTest.class'
+    }
+
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+    violationRules {
+        rule {
+            element = 'CLASS'
+            includes = ['com.moongcheap_backend.order.application.OrderService']
+
+            limit {
+                counter = 'LINE'
+                minimum = 0.80
+            }
+            limit {
+                counter = 'BRANCH'
+                minimum = 0.80
+            }
+        }
+    }
+}

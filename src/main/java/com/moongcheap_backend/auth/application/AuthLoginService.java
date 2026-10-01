@@ -13,10 +13,12 @@ import com.moongcheap_backend.member.infrastructure.LocalCredentialRepository;
 import com.moongcheap_backend.member.infrastructure.MemberRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthLoginService {
@@ -36,18 +38,25 @@ public class AuthLoginService {
         /* 현재 동일 login id, password 방어로직만 존재하며, 이에 대한 브루트 포스 및 디도스 공격에 대한 방어 로직은 존재하지 않음
         * 이를 위해 ip lock을 걸려했지만, 이는 nginx proxy가 붙을지 모르기 때문에 일단 추가하지 않음.
         */
+        String maskedLoginId = maskLoginId(loginId);
         if (failureCounter.isLocked(loginId)) {
+            log.warn("Login blocked: account locked. loginId={}", maskedLoginId);
             throw new BusinessException(ErrorCode.LOGIN_LOCKED);
         }
         Member member = memberRepository.findByLoginIdAndDeletedAtIsNull(loginId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
+                .orElseThrow(() -> {
+                    log.warn("Login failed: member not found. loginId={}", maskedLoginId);
+                    return new BusinessException(ErrorCode.LOGIN_FAILED);
+                });
         LocalCredential credential = localCredentialRepository.findByMemberId(member.getId())
                 .orElseThrow(() -> {
                     failureCounter.recordFailure(loginId);
+                    log.warn("Login failed: local credential not found. loginId={}, memberId={}", maskedLoginId, member.getId());
                     return new BusinessException(ErrorCode.LOGIN_FAILED);
                 });
         if (!passwordEncoder.matches(request.password(), credential.getPassword())) {
             failureCounter.recordFailure(loginId);
+            log.warn("Login failed: password mismatch. loginId={}, memberId={}", maskedLoginId, member.getId());
             throw new BusinessException(ErrorCode.LOGIN_FAILED);
         }
         failureCounter.reset(loginId);
@@ -59,5 +68,10 @@ public class AuthLoginService {
 
     public void logout(HttpServletRequest request) {
         sessionManager.invalidateCurrent(request);
+    }
+
+    // LoginIdValidator 규칙상 최소 4자 이상. 앞 2자만 노출하고 나머지는 마스킹.
+    private static String maskLoginId(String loginId) {
+        return loginId.substring(0, 2) + "*".repeat(loginId.length() - 2);
     }
 }

@@ -1,20 +1,27 @@
 package com.moongcheap_backend.auth.infrastructure;
 
 import com.moongcheap_backend.auth.infrastructure.oauth.CustomOAuth2UserService;
+import com.moongcheap_backend.auth.infrastructure.oauth.GoogleOfflineAccessAuthorizationRequestResolver;
 import com.moongcheap_backend.auth.infrastructure.oauth.OAuth2LoginFailureHandler;
 import com.moongcheap_backend.auth.infrastructure.oauth.OAuth2LoginSuccessHandler;
 import com.moongcheap_backend.common.exception.ErrorCode;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.SessionManagementConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 @Configuration
 @EnableMethodSecurity
@@ -26,22 +33,36 @@ public class SecurityConfig {
     private final OAuth2LoginFailureHandler oauth2LoginFailureHandler;
     private final SessionAuthenticationFilter sessionAuthenticationFilter;
     private final IncompleteSignupFilter incompleteSignupFilter;
+    private final InternalApiKeyFilter internalApiKeyFilter;
     private final CorsConfigurationSource corsConfigurationSource;
+    private final GoogleOfflineAccessAuthorizationRequestResolver googleOfflineAccessResolver;
+    @Lazy
+    private final List<RequestMappingHandlerMapping> requestMappingHandlerMappings;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
-            .addFilterBefore(sessionAuthenticationFilter,
-                UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(internalApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(sessionAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(incompleteSignupFilter, SessionAuthenticationFilter.class)
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
-            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+            .sessionManagement(sm -> sm
+                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                // 세션 재발급은 로그인/권한 변경 지점에서 직접 처리한다.
+                .sessionFixation(SessionManagementConfigurer.SessionFixationConfigurer::none))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.GET,
+                    "/api/group-buys",
+                    "/api/group-buys/**"
+                ).permitAll()
                 .requestMatchers(
                     "/api/auth/signup",
                     "/api/auth/login",
                     "/api/auth/login-id-availability",
+                    // local/dev 프로필에서만 컨트롤러가 존재하는 BrandPay 테스트 세션 API
+                    "/api/dev/brandpay-test/login",
+                    "/api/dev/brandpay-test/fresh-login",
                     "/api/members/nicknames/**",
                     "/api/sellers/*/public",
                     "/oauth2/**",
@@ -51,17 +72,30 @@ public class SecurityConfig {
                     "/v3/api-docs",
                     "/v3/api-docs/**",
                     "/v3/api-docs.yaml",
-                    "/swagger-resources/**"
+                    "/swagger-resources/**",
+                    "/api/products-search/internal/**",
+                    "/api/products-search/internal",
+                    "/api/demand-boards/internal/**",
+                    "/api/awarding/**",
+                    "/actuator/health",
+                    "/actuator/prometheus"
                 ).permitAll()
                 .anyRequest().authenticated()
             )
             .exceptionHandling(eh -> eh
-                .authenticationEntryPoint((req, res, ex) -> writeError(res,
-                    HttpServletResponse.SC_UNAUTHORIZED, ErrorCode.UNAUTHORIZED))
+                .authenticationEntryPoint((req, res, ex) -> {
+                    if (hasMappedHandler(req)) {
+                        writeError(res, HttpServletResponse.SC_UNAUTHORIZED, ErrorCode.UNAUTHORIZED);
+                    } else {
+                        writeError(res, HttpServletResponse.SC_NOT_FOUND, ErrorCode.NOT_FOUND);
+                    }
+                })
                 .accessDeniedHandler((req, res, ex) -> writeError(res,
                     HttpServletResponse.SC_FORBIDDEN, ErrorCode.FORBIDDEN))
             )
             .oauth2Login(o -> o
+                .authorizationEndpoint(a -> a
+                    .authorizationRequestResolver(googleOfflineAccessResolver))
                 .userInfoEndpoint(u -> u.userService(oauth2UserService))
                 .successHandler(oauth2LoginSuccessHandler)
                 .failureHandler(oauth2LoginFailureHandler)
@@ -80,5 +114,18 @@ public class SecurityConfig {
         String body = "{\"success\":false,\"data\":null,\"error\":{\"code\":\"" + code.getCode()
             + "\",\"message\":\"" + code.getMessage() + "\",\"fieldErrors\":[]}}";
         res.getWriter().write(body);
+    }
+
+    private boolean hasMappedHandler(HttpServletRequest req) {
+        for (RequestMappingHandlerMapping mapping : requestMappingHandlerMappings) {
+            try {
+                if (mapping.getHandler(req) != null) {
+                    return true;
+                }
+            } catch (Exception e) {
+                return true;
+            }
+        }
+        return false;
     }
 }

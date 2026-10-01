@@ -5,12 +5,14 @@ import com.moongcheap_backend.order.application.OrderService;
 import com.moongcheap_backend.order.presentation.dto.OrderDetailResponse;
 import com.moongcheap_backend.order.presentation.dto.OrderListResponse;
 import com.moongcheap_backend.order.presentation.dto.OrderShippingAddressRequest;
+import com.moongcheap_backend.order.presentation.dto.OrderSummaryResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,8 +40,15 @@ public class OrderController {
     @GetMapping("/list")
     public ResponseEntity<Page<OrderListResponse>> orderList(SessionPrincipal principal,
         @RequestParam(defaultValue = "ALL") OrderListTab tab,
-        @PageableDefault(size = 20) Pageable pageable) {
+        @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+        Pageable pageable) {
         return ResponseEntity.ok(orderService.viewOrderList(principal.memberId(), tab, pageable));
+    }
+
+    @Operation(summary = "마이페이지 주문 진행 요약 조회")
+    @GetMapping("/summary")
+    public ResponseEntity<OrderSummaryResponse> getOrderSummary(SessionPrincipal principal) {
+        return ResponseEntity.ok(orderService.getSummary(principal.memberId()));
     }
 
     //주문상세조회
@@ -61,10 +70,14 @@ public class OrderController {
 
     //배송지 입력
     @Operation(summary = "배송지 입력")
-    @PostMapping("/shipping-address")
-    public ResponseEntity<OrderDetailResponse> inputShippingAddress(SessionPrincipal principal,
+    @PostMapping("/{orderNo}/shipping-address")
+    public ResponseEntity<OrderDetailResponse> editShippingAddress(SessionPrincipal principal,
+        @PathVariable String orderNo,
         @RequestBody @Valid OrderShippingAddressRequest request) {
-        return ResponseEntity.ok(orderService.inputShippingAddress(principal.memberId(), request));
+        orderService.
+            updateShippingAddress(principal.memberId(), orderNo, request);
+        return ResponseEntity.ok(orderService.
+            viewOrderDetail(principal.memberId(), orderNo));
     }
 
     public enum OrderListTab {
@@ -73,4 +86,6 @@ public class OrderController {
         DELIVERED,
         COMPLETED
     }
+
+    //구매 확정
 }

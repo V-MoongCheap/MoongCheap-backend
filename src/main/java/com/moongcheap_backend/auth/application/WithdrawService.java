@@ -1,29 +1,27 @@
 package com.moongcheap_backend.auth.application;
 
-import com.moongcheap_backend.auth.infrastructure.oauth.GoogleOAuth2Client;
-import com.moongcheap_backend.auth.infrastructure.oauth.KakaoOAuth2Client;
+import com.moongcheap_backend.auth.application.event.MemberWithdrawnEvent;
+import com.moongcheap_backend.auth.domain.PendingProviderUnlink;
+import com.moongcheap_backend.auth.infrastructure.PendingProviderUnlinkRepository;
 import com.moongcheap_backend.auth.presentation.dto.WithdrawRequestDto;
 import com.moongcheap_backend.auth.infrastructure.port.WithdrawEligibilityChecker;
-import com.moongcheap_backend.auth.infrastructure.session.AuthSessionManager;
 import com.moongcheap_backend.common.exception.BusinessException;
 import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.member.domain.LocalCredential;
 import com.moongcheap_backend.member.domain.Member;
 import com.moongcheap_backend.member.domain.SocialCredential;
-import com.moongcheap_backend.member.domain.SocialProvider;
 import com.moongcheap_backend.member.infrastructure.LocalCredentialRepository;
 import com.moongcheap_backend.notification.infrastructure.NotificationOptOutRepository;
 import com.moongcheap_backend.member.infrastructure.MemberRepository;
 import com.moongcheap_backend.member.infrastructure.ShippingAddressRepository;
 import com.moongcheap_backend.member.infrastructure.SocialCredentialRepository;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,11 +34,10 @@ public class WithdrawService {
     private final SocialCredentialRepository socialCredentialRepository;
     private final ShippingAddressRepository shippingAddressRepository;
     private final NotificationOptOutRepository notificationOptOutRepository;
+    private final PendingProviderUnlinkRepository pendingProviderUnlinkRepository;
     private final PasswordEncoder passwordEncoder;
-    private final AuthSessionManager sessionManager;
     private final WithdrawEligibilityChecker eligibilityChecker;
-    private final KakaoOAuth2Client kakaoOAuth2Client;
-    private final GoogleOAuth2Client googleOAuth2Client;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void withdraw(Long memberId, WithdrawRequestDto request) {
@@ -58,9 +55,16 @@ public class WithdrawService {
         eligibilityChecker.ensureWithdrawable(memberId);
 
         List<SocialCredential> socials = socialCredentialRepository.findAllByMemberId(memberId);
-        String googleAccessToken = currentGoogleAccessToken();
-
-        sessionManager.invalidateAllForMember(memberId);
+        LocalDateTime now = LocalDateTime.now();
+        for (SocialCredential cred : socials) {
+            pendingProviderUnlinkRepository.save(PendingProviderUnlink.of(
+                memberId,
+                cred.getProvider(),
+                cred.getProviderId(),
+                cred.getRefreshTokenEnc(),
+                now
+            ));
+        }
 
         shippingAddressRepository.deleteAllByMemberId(memberId);
         notificationOptOutRepository.deleteAllByMemberId(memberId);
@@ -69,23 +73,7 @@ public class WithdrawService {
 
         member.withdraw();
 
-        unlinkFromProviders(socials, googleAccessToken);
-    }
-
-    private void unlinkFromProviders(List<SocialCredential> socials, String googleAccessToken) {
-        for (SocialCredential cred : socials) {
-            switch (cred.getProvider()) {
-                case KAKAO -> kakaoOAuth2Client.unlink(cred.getProviderId());
-                case GOOGLE -> googleOAuth2Client.revoke(googleAccessToken);
-            }
-        }
-    }
-
-    private String currentGoogleAccessToken() {
-        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs)) return null;
-        HttpSession session = attrs.getRequest().getSession(false);
-        if (session == null) return null;
-        return (String) session.getAttribute(AuthSessionManager.GOOGLE_ACCESS_TOKEN_ATTR);
+        eventPublisher.publishEvent(new MemberWithdrawnEvent(memberId));
     }
 
     private void verifyLocalWithdraw(WithdrawRequestDto request, LocalCredential credential) {

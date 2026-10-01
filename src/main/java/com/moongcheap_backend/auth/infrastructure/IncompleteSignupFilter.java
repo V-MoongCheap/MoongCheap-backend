@@ -20,8 +20,15 @@ public class IncompleteSignupFilter extends OncePerRequestFilter {
 
     private static final Set<String> ALLOWED_PATHS = Set.of(
             "/api/auth/social-signup/complete",
-            "/api/auth/logout"
+            "/api/auth/logout",
+            "/api/members/nicknames/availability"
     );
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs");
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,

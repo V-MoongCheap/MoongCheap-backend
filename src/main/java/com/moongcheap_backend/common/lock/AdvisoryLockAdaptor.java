@@ -25,6 +25,21 @@ public class AdvisoryLockAdaptor {
                 .getSingleResult();
     }
 
+    /**
+     * 트랜잭션 범위 Advisory Lock 비블로킹 획득.
+     * 다른 세션이 이미 잡고 있으면 대기하지 않고 즉시 false 반환.
+     */
+    public boolean tryAcquireXactLock(String lockKey) {
+        Boolean acquired = (Boolean) em.createNativeQuery(
+                        "SELECT pg_try_advisory_xact_lock(" +
+                                "('x' || substr(md5(:k), 1, 16))::bit(64)::bigint" +
+                                ")"
+                )
+                .setParameter("k", lockKey)
+                .getSingleResult();
+        return Boolean.TRUE.equals(acquired);
+    }
+
     private void setLockTimeout(String value) {
         em.createNativeQuery("SET LOCAL lock_timeout = '" + sanitize(value) + "'")
                 .executeUpdate();

@@ -1,0 +1,128 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "max_ngram_diff": 3,
+      "refresh_interval": "5s"
+    },
+    "analysis": {
+      "char_filter": {
+        "unit_normalizer": {
+          "type": "mapping",
+          "mappings": [
+            "ℓ => l",
+            "㎖ => ml",
+            "㎏ => kg",
+            "㎎ => mg",
+            "ｇ => g",
+            "리터 => l",
+            "리타 => l",
+            "밀리리터 => ml",
+            "미리리터 => ml",
+            "그램 => g",
+            "킬로그램 => kg",
+            "밀리그램 => mg",
+            "톤 => t",
+            "온스 => oz",
+            "파운드 => lb"
+          ]
+        },
+        "unit_pattern_normalizer": {
+          "type": "pattern_replace",
+          "pattern": "(?i)(\\d+(?:[.,]\\d+)?)\\s*(밀리리터|미리리터|ml|리터|리타|l|킬로그램|kg|그램|g|밀리그램|mg|톤|t|온스|oz|파운드|lb|개입|입|매|장|팩|pack|pk|구|p)(?![a-z가-힣0-9])",
+          "replacement": "$1$2 "
+        },
+        "unit_alias_normalizer": {
+          "type": "pattern_replace",
+          "pattern": "(?i)(\\d+(?:[.,]\\d+)?)(밀리리터|미리리터|ml)\\b",
+          "replacement": "$1ml"
+        }
+      },
+      "filter": {
+        "unit_synonym": {
+          "type": "synonym_graph",
+          "lenient": true,
+          "synonyms": [
+            "개입, 입, 개",
+            "팩, pack, pk"
+          ]
+        },
+        "truncate_5": {
+          "type": "truncate",
+          "length": 5
+        }
+      },
+      "tokenizer": {
+        "product_edge_ngram_tokenizer": {
+          "type": "edge_ngram",
+          "min_gram": 2,
+          "max_gram": 5,
+          "token_chars": ["letter", "digit"]
+        }
+      },
+      "analyzer": {
+        "product_name_analyzer": {
+          "type": "custom",
+          "char_filter": ["unit_normalizer", "unit_pattern_normalizer"],
+          "tokenizer": "standard",
+          "filter": ["lowercase", "unit_synonym"]
+        },
+        "product_spec_analyzer": {
+          "type": "custom",
+          "char_filter": ["unit_normalizer", "unit_pattern_normalizer"],
+          "tokenizer": "standard",
+          "filter": ["lowercase", "unit_synonym"]
+        },
+        "product_edge_ngram_analyzer": {
+          "type": "custom",
+          "char_filter": ["unit_normalizer", "unit_pattern_normalizer"],
+          "tokenizer": "product_edge_ngram_tokenizer",
+          "filter": ["lowercase"]
+        },
+        "product_edge_ngram_search_analyzer": {
+          "type": "custom",
+          "char_filter": ["unit_normalizer", "unit_pattern_normalizer"],
+          "tokenizer": "standard",
+          "filter": ["lowercase", "truncate_5"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "name": {
+        "type": "text",
+        "analyzer": "product_spec_analyzer",
+        "fields": {
+          "ngram": {
+            "type": "text",
+            "analyzer": "product_edge_ngram_analyzer",
+            "search_analyzer": "product_edge_ngram_search_analyzer"
+          },
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "specSummary": {
+        "type": "text",
+        "analyzer": "product_spec_analyzer",
+        "fields": {
+          "ngram": {
+            "type": "text",
+            "analyzer": "product_edge_ngram_analyzer",
+            "search_analyzer": "product_edge_ngram_search_analyzer"
+          }
+        }
+      },
+      "listPrice": { "type": "integer" },
+      "thumbnailUrl": { "type": "keyword", "index": false },
+      "status": { "type": "keyword" },
+      "volumeMl": { "type": "integer" },
+      "weightG": { "type": "integer" },
+      "packCount": { "type": "integer" }
+    }
+  }
+}

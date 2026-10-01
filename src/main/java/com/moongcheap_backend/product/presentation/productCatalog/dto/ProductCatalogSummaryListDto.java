@@ -21,14 +21,16 @@ public record ProductCatalogSummaryListDto(
     public record ProductCatalogSummaryDto(
         Long id,
         String name,
-        String thumbnailUrl
+        String thumbnailUrl,
+        Integer listPrice
     ) {
 
         public static ProductCatalogSummaryDto from(ProductCatalog catalog) {
             return new ProductCatalogSummaryDto(
                 catalog.getId(),
                 catalog.getName(),
-                catalog.getThumbnailUrl()
+                catalog.getThumbnailUrl(),
+                catalog.getListPrice()
             );
         }
     }

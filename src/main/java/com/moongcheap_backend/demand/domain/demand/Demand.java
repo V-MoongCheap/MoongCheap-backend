@@ -65,7 +65,11 @@ public class Demand extends BaseTimeEntity {
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
 
-    @Builder
+    public void cancel() {
+        this.status = DemandStatus.CANCELED;
+    }
+
+    @Builder(builderClassName = "DefaultBuilder")
     private Demand(Long memberId, Long catalogId, Long payMethodId, Integer desiredPriceMin,
         Integer desiredPriceMax,
         LocalDateTime desireEndAt, Integer quantity, String extraRequirement,
@@ -74,10 +78,43 @@ public class Demand extends BaseTimeEntity {
         this.catalogId = catalogId;
         this.payMethodId = payMethodId;
         this.desiredPriceMin = desiredPriceMin;
+
         this.desiredPriceMax = desiredPriceMax;
         this.desireEndAt = desireEndAt;
         this.quantity = quantity;
         this.extraRequirement = extraRequirement;
         this.isSubstitutable = isSubstitutable;
+    }
+
+    @Builder(builderMethodName = "boardJoinBuilder", builderClassName = "BoardJoinBuilder")
+    private Demand(Long memberId, Long catalogId, Long demandBoardId, Long payMethodId,
+        Integer desiredPriceMin, Integer desiredPriceMax, LocalDateTime desireEndAt,
+        Integer quantity, boolean isSubstitutable, String extraRequirement) {
+        this.memberId = memberId;
+        this.catalogId = catalogId;
+        this.demandBoardId = demandBoardId;
+        this.payMethodId = payMethodId;
+
+        this.desiredPriceMin = desiredPriceMin;
+        this.desiredPriceMax = desiredPriceMax;
+        this.desireEndAt = desireEndAt;
+        this.quantity = quantity;
+        this.isSubstitutable = isSubstitutable;
+        this.extraRequirement = extraRequirement;
+        this.status = DemandStatus.ASSIGNED;
+    }
+
+    public void acceptOffer() {
+        this.status = DemandStatus.ASSIGNED;
+    }
+
+    public void rejectOffer() {
+        this.demandBoardId = null;
+        this.status = DemandStatus.UNASSIGNED;
+    }
+
+    public void substituteOffer(Long demandBoardId) {
+        this.demandBoardId = demandBoardId;
+        this.status = DemandStatus.SUBSTITUTE_OFFERED;
     }
 }

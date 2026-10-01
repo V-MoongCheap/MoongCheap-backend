@@ -13,10 +13,10 @@ ALTER TABLE "demand"
     ADD COLUMN "pay_method_id" BIGINT NULL;
 
 ALTER TABLE "demand"
-    ADD CONSTRAINT "FK_BrandpayPayMethod_TO_demand"
-        FOREIGN KEY ("pay_method_id") REFERENCES "BrandpayPayMethod" ("id");
+    ADD CONSTRAINT "FK_brand_pay_method_TO_demand"
+        FOREIGN KEY ("pay_method_id") REFERENCES "brand_pay_method" ("id");
 
-COMMENT ON COLUMN "demand"."pay_method_id" IS '연결된 브랜드페이 결제수단 ID (BrandpayPayMethod.id). NULL이면 결제수단 미연결 상태';
+COMMENT ON COLUMN "demand"."pay_method_id" IS '연결된 브랜드페이 결제수단 ID (brand_pay_method.id). NULL이면 결제수단 미연결 상태';
 
 COMMIT;
 
@@ -26,7 +26,7 @@ COMMIT;
  * ---------------------------------------------------------------------------
 BEGIN;
 
-ALTER TABLE "demand" DROP CONSTRAINT "FK_BrandpayPayMethod_TO_demand";
+ALTER TABLE "demand" DROP CONSTRAINT "FK_brand_pay_method_TO_demand";
 ALTER TABLE "demand" DROP COLUMN "pay_method_id";
 
 COMMIT;

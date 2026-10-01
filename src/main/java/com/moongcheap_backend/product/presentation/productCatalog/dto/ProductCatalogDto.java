@@ -6,6 +6,7 @@ public record ProductCatalogDto(
     Long id,
     String name,
     String thumbnailUrl,
+    Integer listPrice,
     String specSummary,
     String description
 ) {
@@ -15,6 +16,7 @@ public record ProductCatalogDto(
             catalog.getId(),
             catalog.getName(),
             catalog.getThumbnailUrl(),
+            catalog.getListPrice(),
             catalog.getSpecSummary(),
             catalog.getDescription()
         );

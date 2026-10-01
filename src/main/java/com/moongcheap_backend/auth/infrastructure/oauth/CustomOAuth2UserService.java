@@ -5,6 +5,8 @@ import com.moongcheap_backend.auth.application.PrincipalFactory;
 import com.moongcheap_backend.auth.application.SocialLinkService;
 import com.moongcheap_backend.auth.domain.NicknameValidator;
 import com.moongcheap_backend.auth.infrastructure.session.AuthSessionManager;
+import com.moongcheap_backend.common.exception.BusinessException;
+import com.moongcheap_backend.common.exception.ErrorCode;
 import com.moongcheap_backend.common.security.SessionPrincipal;
 import com.moongcheap_backend.member.domain.Member;
 import com.moongcheap_backend.member.domain.SocialCredential;
@@ -12,6 +14,7 @@ import com.moongcheap_backend.member.infrastructure.MemberRepository;
 import com.moongcheap_backend.member.infrastructure.SocialCredentialRepository;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
@@ -101,16 +104,23 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
     }
 
     private Member createNewMember(OAuthAttributes attrs) {
-        String nickname = nicknameService.allocateForSocial(attrs.nickname());
-        Member saved = memberRepository.save(Member.builder()
-                .nickname(NicknameValidator.toKey(nickname))
-                .email(attrs.email())
-                .build());
-        socialCredentialRepository.save(SocialCredential.builder()
-                .memberId(saved.getId())
-                .provider(attrs.provider())
-                .providerId(attrs.providerUserId())
-                .build());
-        return saved;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try {
+                String nickname = nicknameService.allocateForSocial(attrs.nickname());
+                Member saved = memberRepository.saveAndFlush(Member.builder()
+                        .nickname(NicknameValidator.toKey(nickname))
+                        .email(attrs.email())
+                        .build());
+                socialCredentialRepository.save(SocialCredential.builder()
+                        .memberId(saved.getId())
+                        .provider(attrs.provider())
+                        .providerId(attrs.providerUserId())
+                        .build());
+                return saved;
+            } catch (DataIntegrityViolationException ignored) {
+                // 닉네임 충돌 시 재시도
+            }
+        }
+        throw new BusinessException(ErrorCode.NICKNAME_DUPLICATED, "닉네임 자동 발급에 실패했습니다.");
     }
 }

@@ -3,8 +3,6 @@ package com.moongcheap_backend.order.presentation.dto;
 import com.moongcheap_backend.order.domain.OrderStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Schema(example = """
     {
@@ -58,18 +56,15 @@ public record OrderDetailResponse(
         String productName, // 상품명
         Integer quantity, // 주문 수량
         Integer productAmount, // 상품 금액
-        GroupBuyInfo groupBuy, // 공동구매 정보
-        List<OrderAction> availableActions // 현재 주문 상태에서 가능한 액션
+        GroupBuyInfo groupBuy // 공동구매 정보
     ) {
 
     }
 
     // 공동구매 정보
     public record GroupBuyInfo(
-        String title, // 공동구매명
-        Integer targetCount, // 목표 참여 인원
-        Integer currentCount, // 현재 참여 인원
-        LocalDateTime endAt // 공동구매 종료 일시
+        Long groupBuyId, //공동구매 id
+        String title // 공동구매명
     ) {
 
     }
@@ -91,11 +86,5 @@ public record OrderDetailResponse(
         String paymentMethod // 결제수단
     ) {
 
-    }
-
-    // 화면에 노출할 주문 액션
-    public enum OrderAction {
-        TRACK_SHIPMENT, // 배송현황 확인
-        CONFIRM_RECEIPT // 수령 확인
     }
 }
