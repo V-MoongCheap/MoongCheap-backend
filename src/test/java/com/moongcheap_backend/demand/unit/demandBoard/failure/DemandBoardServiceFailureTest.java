@@ -66,6 +66,14 @@ class DemandBoardServiceFailureTest {
     @InjectMocks
     private DemandBoardService service;
 
+    @Mock
+    private DemandBoardService mockSelf;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "self", mockSelf);
+    }
+
     private DemandBoardJoinRequestDto joinRequest() {
         return new DemandBoardJoinRequestDto(20L, 1, false, null, true, true, true, true);
     }

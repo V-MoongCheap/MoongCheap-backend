@@ -468,8 +468,10 @@ public class DemandBoardService {
                 applied++;
             } catch (BusinessException e) {
                 switch (e.getErrorCode()) {
-                    case DEMAND_BOARD_NOT_FOUND -> {
-                        // 상태 변경 이전에 던져지는 예외이므로 다른 boardResult에 영향 없음
+                    // 두 케이스 모두 메인 TX 쓰기 이전에 던져지므로 다른 boardResult에 영향 없음.
+                    // PRODUCT_NOT_ORDERABLE은 handleExpiredAwardWinner가 REQUIRES_NEW로
+                    // LOST 전이와 좀비 board 종결을 이미 커밋한 상태.
+                    case DEMAND_BOARD_NOT_FOUND, PRODUCT_NOT_ORDERABLE -> {
                         staleRejected++;
                         log.warn("Awarding stale: boardId={}, code={}, message={}",
                             br.boardId(), e.getErrorCode(), e.getMessage());
@@ -497,10 +499,32 @@ public class DemandBoardService {
                 loserIds.add(evaluation.productId());
             }
         }
+        if (winnerId.isPresent()
+            && self.handleExpiredAwardWinner(winnerId.get(), boardResult.boardId(), now)) {
+            throw new BusinessException(ErrorCode.PRODUCT_NOT_ORDERABLE);
+        }
         transactionBoardAndDemands(winnerId.isEmpty(), boardResult, now);
         transitionProducts(winnerId, loserIds, boardResult, now);
         productAwardEvaluationRepository.saveAll(fromBoardResult(boardResult));
         winnerId.ifPresent(groupBuyService::createGroupBuy);
+    }
+
+    // 만료된 winner를 LOST로 전이한다. 그 전이로 board에 AWARDING 상품이 하나도 남지 않으면
+    // board를 GB_CANCELED, 연결된 demand를 FAILED로 종결시켜 좀비 상태를 방지한다.
+    // 메인 award TX가 롤백되어도 이 변경은 유지되어야 하므로 REQUIRES_NEW로 분리.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean handleExpiredAwardWinner(Long productId, Long boardId, LocalDateTime now) {
+        int transitioned = productRepository.transitionStatusForBoardIfExpired(
+            productId, boardId, ProductStatus.AWARDING, ProductStatus.LOST, now);
+        if (transitioned == 0) {
+            return false;
+        }
+        boolean anyRemaining = productRepository
+            .existsByDemandBoardIdAndStatus(boardId, ProductStatus.AWARDING);
+        if (!anyRemaining) {
+            demandBoardRepository.cancelBoardsAndFailDemands(List.of(boardId), now);
+        }
+        return true;
     }
 
     private void transactionBoardAndDemands(boolean isUnawarded, BoardResult boardResult,

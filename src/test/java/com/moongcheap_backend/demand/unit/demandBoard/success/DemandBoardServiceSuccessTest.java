@@ -482,6 +482,73 @@ class DemandBoardServiceSuccessTest {
             assertThat(result.applied()).isEqualTo(0);
             assertThat(result.staleRejected()).isEqualTo(1);
         }
+
+        @Test
+        void winner의_sale_end_at이_만료되면_staleRejected로_처리되고_메인_TX는_쓰지_않는다() {
+            Evaluation winner = new Evaluation(4L, BigDecimal.valueOf(0.9), "good", true);
+            Evaluation loser = new Evaluation(2L, BigDecimal.valueOf(0.1), "bad", false);
+            BoardResult br = new BoardResult(6L, LocalDateTime.now(), List.of(winner, loser));
+
+            when(mockSelf.handleExpiredAwardWinner(eq(4L), eq(6L), any())).thenReturn(true);
+
+            AwardingChunkResult result = service.awardChunk(List.of(br));
+
+            assertThat(result.applied()).isEqualTo(0);
+            assertThat(result.staleRejected()).isEqualTo(1);
+            verify(demandBoardRepository, org.mockito.Mockito.never())
+                .markAwarded(anyLong(), any(), any(), any());
+            verify(groupBuyService, org.mockito.Mockito.never()).createGroupBuy(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("handleExpiredAwardWinner - 성공")
+    class HandleExpiredAwardWinnerTest {
+
+        @Test
+        void 만료가_아니면_아무_변경도_없이_false를_반환한다() {
+            LocalDateTime now = LocalDateTime.now();
+            when(productRepository.transitionStatusForBoardIfExpired(
+                eq(4L), eq(6L), eq(ProductStatus.AWARDING), eq(ProductStatus.LOST), eq(now)))
+                .thenReturn(0);
+
+            boolean result = service.handleExpiredAwardWinner(4L, 6L, now);
+
+            assertThat(result).isFalse();
+            verify(demandBoardRepository, org.mockito.Mockito.never())
+                .cancelBoardsAndFailDemands(anyList(), any());
+        }
+
+        @Test
+        void 만료이고_다른_AWARDING이_남아있으면_LOST만_전이하고_board는_유지한다() {
+            LocalDateTime now = LocalDateTime.now();
+            when(productRepository.transitionStatusForBoardIfExpired(
+                eq(4L), eq(6L), eq(ProductStatus.AWARDING), eq(ProductStatus.LOST), eq(now)))
+                .thenReturn(1);
+            when(productRepository.existsByDemandBoardIdAndStatus(6L, ProductStatus.AWARDING))
+                .thenReturn(true);
+
+            boolean result = service.handleExpiredAwardWinner(4L, 6L, now);
+
+            assertThat(result).isTrue();
+            verify(demandBoardRepository, org.mockito.Mockito.never())
+                .cancelBoardsAndFailDemands(anyList(), any());
+        }
+
+        @Test
+        void 만료이고_남은_AWARDING이_없으면_board와_demand를_종결시킨다() {
+            LocalDateTime now = LocalDateTime.now();
+            when(productRepository.transitionStatusForBoardIfExpired(
+                eq(4L), eq(6L), eq(ProductStatus.AWARDING), eq(ProductStatus.LOST), eq(now)))
+                .thenReturn(1);
+            when(productRepository.existsByDemandBoardIdAndStatus(6L, ProductStatus.AWARDING))
+                .thenReturn(false);
+
+            boolean result = service.handleExpiredAwardWinner(4L, 6L, now);
+
+            assertThat(result).isTrue();
+            verify(demandBoardRepository).cancelBoardsAndFailDemands(List.of(6L), now);
+        }
     }
 
     @Nested
