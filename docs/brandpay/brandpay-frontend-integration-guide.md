@@ -468,4 +468,4 @@ https://api.moongcheap.shop/api/payments/brandpay/callback
 - [토스페이먼츠 BrandPay API](https://docs.tosspayments.com/reference/brandpay)
 - [프로젝트 테스트 콘솔](../tools/brandpay-test/README.md)
 - [BrandPay 테스트 케이스](./brandpay-test-cases.md)
-- [customerToken 문제 해결 기록](./brandpay-customer-token-troubleshooting.md)
+- [customerToken 문제 해결 기록](../troubleshooting/brandpay-customer-token-troubleshooting.md)
