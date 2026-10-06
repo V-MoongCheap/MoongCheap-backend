@@ -6,7 +6,7 @@
 
 현재 코드 기준: 이전 PostgreSQL 큐 구현은 롤백한 뒤 이 문서의 Redis Sorted Set + Outbox 구조를 새 V16으로 구현했다. Payments에는 nextAttemptAt을 두지 않고 attemptCount, processingToken, processingDeadline, idempotencyKey와 고정 요청 정보를 저장한다. 별도로 과거 DB 큐 V16/V17을 적용한 환경이 있다면 현재 V16과 번호·내용이 충돌하므로 배포 전에 반드시 별도 전환 마이그레이션을 결정한다.
 
-관련 문서: [설계 논의 기록](brandpay-design-history.md), [PostgreSQL 큐 설계](brandpay-postgresql-queue-design.md).
+관련 문서: [설계 논의 기록](./brandpay-design-history.md), [PostgreSQL 큐 설계](./brandpay-postgresql-queue-design.md).
 
 ## 1. 선택한 구조
 

@@ -1,0 +1,33 @@
+sequenceDiagram
+autonumber 1
+actor U as 수요자(User)
+actor OP as 운영자/관리자
+participant B as Backend
+participant DB as DB
+participant AI as AI Service
+
+Note over U,B: [1] 수요 생성
+U->>B: POST /api/members/me/demand
+B->>DB: INSERT demand (status=UNASSIGNED)
+B-->>U: 200 { demandId }
+
+Note over DB,AI: [2] AI가 DB에서 직접 SELECT (Backend endpoint 없음)
+AI->>DB: SELECT demand WHERE status=UNASSIGNED
+
+Note over B,AI: [3] AI 수요 취합 → DemandBoard 편성
+AI->>B: POST /api/demand-boards/internal/formation-plans
+activate B
+B->>DB: INSERT demand_board (status=GB_GATHERING)
+B->>DB: UPDATE demand SET status=ASSIGNED,<br/>demand_board_id=?
+B-->>AI: 200 FormationPlanResponse
+deactivate B
+
+Note over U,B: [4] 수요 참여 — 기존 보드에 신규 참여자
+U->>B: POST /api/demand-boards/{id}/join
+B->>DB: SELECT demand_board FOR UPDATE (락)
+B->>DB: INSERT demand (status=ASSIGNED)<br/>+ UPDATE participant_count
+B-->>U: 200 { demandId }
+
+Note over OP,DB: [5] 상품 및 카탈로그 등록 (DB 직접 INSERT)
+OP->>DB: INSERT product_catalog
+OP->>DB: INSERT product (status=ACTIVE / AWARDING)

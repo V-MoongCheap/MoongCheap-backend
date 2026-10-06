@@ -1,6 +1,6 @@
 # Enum 값 정리
 
-> Status 값(생애주기 계열)은 [status.md](status.md)를 참조하세요.
+> Status 값(생애주기 계열)은 [status.md](./status.md)를 참조하세요.
 > 이 문서는 상태 전이가 없는 비-Status 계열 enum(역할, 제공자, 알림 종류, 에러 코드 등)을 다룹니다.
 
 ## MemberRole

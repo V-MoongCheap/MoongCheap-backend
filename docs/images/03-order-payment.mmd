@@ -1,0 +1,30 @@
+sequenceDiagram
+autonumber 28
+participant SCH as @Scheduled
+participant B as Backend
+participant R as Redis (Outbox 큐)
+participant DB as DB
+participant BP as Toss BrandPay
+
+Note over SCH,DB: [9] 주문 자동 생성 (Redis 소비)
+SCH->>B: GroupBuyOrderCreationConsumer tick
+B->>R: BRPOP group_buy_outbox
+activate B
+B->>DB: SELECT demand (status=PAYMENT_PENDING)
+loop chunk (ORDER_BATCH_SIZE 씩)
+  B->>DB: INSERT orders (batch)
+end
+B->>R: LPUSH payment_outbox (자동결제 지시)
+deactivate B
+
+Note over SCH,BP: [10] 자동 결제 (BrandPay)
+SCH->>B: PaymentWorkerPool tick
+B->>R: BRPOP payment_outbox
+activate B
+B->>BP: POST /v1/brandpay/authorizations/...
+BP-->>B: accessToken
+B->>BP: POST /v1/brandpay/payments (자동결제)
+BP-->>B: 결제 결과
+B->>DB: UPDATE payment / orders (SUCCEEDED / FAILED)
+B->>DB: UPDATE demand (PAYMENT_PENDING → PAID / FAILED)
+deactivate B
