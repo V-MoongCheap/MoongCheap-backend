@@ -1,0 +1,30 @@
+sequenceDiagram
+autonumber 15
+participant SCH as @Scheduled
+participant AI as AI Service
+participant B as Backend
+participant DB as DB
+participant R as Redis (Outbox 큐)
+
+Note over SCH,B: [6] 판정 준비 — sale_end_at 도래
+SCH->>B: tick (GroupBuyJudgmentScheduler)
+B->>DB: UPDATE demand_board<br/>SET status=GB_ACTION_REQUIRED → GB_AWARDING
+
+Note over AI,B: [7] AI 폴링 — 판정 대기 보드 조회
+loop 1분 주기
+  AI->>B: GET /api/awarding/internal/pending?size=50
+  B->>DB: SELECT demand_board WHERE status=GB_AWARDING
+  B-->>AI: [board list + 참여 정보]
+end
+
+Note over AI,B: [8] AI 낙찰 결과 반영
+AI->>B: POST /api/awarding/internal/result
+activate B
+B->>DB: UPDATE demand_board GB_AWARDING → GB_ACTION_REQUIRED (or GB_CANCELED)
+B->>DB: UPDATE demand ASSIGNED → PAYMENT_PENDING (or FAILED)
+B->>DB: UPDATE product AWARDING → AWARDED/LOST
+B->>DB: INSERT product_award_evaluation
+B->>DB: INSERT group_buy (winner 있는 경우)
+B->>R: LPUSH group_buy_outbox (createOrder 지시)
+B-->>AI: 200 AwardingResultResponse
+deactivate B

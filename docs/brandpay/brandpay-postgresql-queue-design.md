@@ -2,7 +2,7 @@
 
 작성일: 2026-09-22
 
-상태: DB 큐 구현은 롤백했다. 아래 구현·마이그레이션·검증 내용은 당시 기록이며 현재 코드에 적용된 상태가 아니다. 후속 방향은 [Redis Sorted Set 설계](brandpay-redis-sorted-set-design.md)를 참고한다. 설계 배경은 [논의 기록](brandpay-design-history.md)에 남긴다.
+상태: DB 큐 구현은 롤백했다. 아래 구현·마이그레이션·검증 내용은 당시 기록이며 현재 코드에 적용된 상태가 아니다. 후속 방향은 [Redis Sorted Set 설계](./brandpay-redis-sorted-set-design.md)를 참고한다. 설계 배경은 [논의 기록](./brandpay-design-history.md)에 남긴다.
 
 ## 1. 목표와 전제
 

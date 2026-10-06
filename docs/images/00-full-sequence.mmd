@@ -1,0 +1,82 @@
+sequenceDiagram
+autonumber
+actor U as 수요자(User)
+actor OP as 운영자/관리자
+participant B as Backend
+participant DB as DB (Demand/Board/Product)
+participant R as Redis (Outbox 큐)
+participant SCH as @Scheduled
+participant AI as AI Service
+participant BP as Toss BrandPay
+
+Note over U,B: [1] 수요 생성
+U->>B: POST /api/members/me/demand
+B->>DB: INSERT demand (status=UNASSIGNED)
+B-->>U: 200 { demandId }
+
+Note over AI,DB: [2] AI가 DB에서 직접 SELECT (Backend endpoint 없음)
+AI->>DB: SELECT demand WHERE status=UNASSIGNED
+
+Note over AI,B: [3] AI 수요 취합 → DemandBoard 편성
+AI->>B: POST /api/demand-boards/internal/formation-plans
+activate B
+B->>DB: INSERT demand_board (status=GB_GATHERING)
+B->>DB: UPDATE demand SET status=ASSIGNED,<br/>demand_board_id=?
+B-->>AI: 200 FormationPlanResponse
+deactivate B
+
+Note over U,B: [4] 수요 참여 — 기존 보드에 신규 참여자
+U->>B: POST /api/demand-boards/{id}/join
+B->>DB: SELECT demand_board FOR UPDATE (락)
+B->>DB: INSERT demand (status=ASSIGNED)<br/>+ UPDATE participant_count
+B-->>U: 200 { demandId }
+
+Note over OP,DB: [5] 상품 및 카탈로그 등록 (DB 직접 INSERT)
+OP->>DB: INSERT product_catalog
+OP->>DB: INSERT product (status=ACTIVE / AWARDING)
+
+Note over SCH,B: [6] 판정 준비 — sale_end_at 도래
+SCH->>B: tick (GroupBuyJudgmentScheduler)
+B->>DB: UPDATE demand_board<br/>SET status=GB_ACTION_REQUIRED → GB_AWARDING
+
+Note over AI,B: [7] AI 폴링 — 판정 대기 보드 조회
+loop 1분 주기
+  AI->>B: GET /api/awarding/internal/pending?size=50
+  B->>DB: SELECT demand_board WHERE status=GB_AWARDING
+  B-->>AI: [board list + 참여 정보]
+end
+
+Note over AI,B: [8] AI 낙찰 결과 반영
+AI->>B: POST /api/awarding/internal/result
+activate B
+B->>DB: UPDATE demand_board GB_AWARDING → GB_ACTION_REQUIRED (or GB_CANCELED)
+B->>DB: UPDATE demand ASSIGNED → PAYMENT_PENDING (or FAILED)
+B->>DB: UPDATE product AWARDING → AWARDED/LOST
+B->>DB: INSERT product_award_evaluation
+B->>DB: INSERT group_buy (winner 있는 경우)
+B->>R: LPUSH group_buy_outbox (createOrder 지시)
+B-->>AI: 200 AwardingResultResponse
+deactivate B
+
+Note over R,B: [9] 주문 자동 생성 (Redis 소비)
+SCH->>B: GroupBuyOrderCreationConsumer tick
+B->>R: BRPOP group_buy_outbox
+activate B
+B->>DB: SELECT demand (status=PAYMENT_PENDING)
+loop chunk (ORDER_BATCH_SIZE 씩)
+  B->>DB: INSERT orders (batch)
+end
+B->>R: LPUSH payment_outbox (자동결제 지시)
+deactivate B
+
+Note over R,BP: [10] 자동 결제 (BrandPay)
+SCH->>B: PaymentWorkerPool tick
+B->>R: BRPOP payment_outbox
+activate B
+B->>BP: POST /v1/brandpay/authorizations/...
+BP-->>B: accessToken
+B->>BP: POST /v1/brandpay/payments (자동결제)
+BP-->>B: 결제 결과
+B->>DB: UPDATE payment / orders (SUCCEEDED / FAILED)
+B->>DB: UPDATE demand (PAYMENT_PENDING → PAID / FAILED)
+deactivate B

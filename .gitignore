@@ -37,6 +37,8 @@ out/
 .vscode/
 
 ### Local only ###
+docs/presentation/
+docs/추가사항.md
 docs/concurrency.md
 docs/demand-query.md
 docs/demand-board-query-index.md
