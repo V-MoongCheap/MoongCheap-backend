@@ -121,4 +121,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         @Param("expectedStatus") ProductStatus expectedStatus,
         @Param("newStatus") ProductStatus newStatus,
         @Param("now") LocalDateTime now);
+
+    @Modifying
+    @Query("UPDATE Product p SET p.status = :newStatus, p.updatedAt = :now "
+        + "WHERE p.id = :id "
+        + "  AND p.demandBoardId = :boardId "
+        + "  AND p.status = :expectedStatus "
+        + "  AND p.saleEndAt < :now")
+    int transitionStatusForBoardIfExpired(
+        @Param("id") Long id,
+        @Param("boardId") Long boardId,
+        @Param("expectedStatus") ProductStatus expectedStatus,
+        @Param("newStatus") ProductStatus newStatus,
+        @Param("now") LocalDateTime now);
+
+    boolean existsByDemandBoardIdAndStatus(Long demandBoardId, ProductStatus status);
 }
